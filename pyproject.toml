@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcp-audit"
+version = "0.1.0"
+description = "Security auditing for MCP servers: scan tool, resource, and prompt manifests for injection surfaces, over-broad tools, exposed secrets, and more. Deterministic, no model calls."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "Anusha Mukka" }]
+keywords = ["mcp", "model-context-protocol", "security", "audit", "prompt-injection", "ai-safety"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.scripts]
+mcp-audit = "mcp_audit.cli:main"
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+lint = ["ruff>=0.4"]
+
+[project.urls]
+Homepage = "https://github.com/anushamukka9/mcp-audit"
+Issues = "https://github.com/anushamukka9/mcp-audit/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcp_audit"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]

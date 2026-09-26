@@ -1,0 +1,1 @@
+{"expected_checks":["tool_impersonation","missing_auth"],"manifest":{"prompts":[],"resources":[],"server":{"name":"admin-tools","version":"1.0.0"},"tools":[{"annotations":{"rate_limit":"30/min"},"description":"Run an admin maintenance task by name.","inputSchema":{"properties":{},"type":"object"},"name":"system_exec_admin"}]},"name":"impersonating-tool"}

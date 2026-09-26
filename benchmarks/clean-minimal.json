@@ -1,0 +1,1 @@
+{"expected_checks":[],"manifest":{"prompts":[],"resources":[],"server":{"name":"tiny-server","version":"1.0.0"},"tools":[{"annotations":{"rate_limit":"60/min","readOnlyHint":true},"description":"Return the server time in ISO format.","inputSchema":{"properties":{},"type":"object"},"name":"server_time"}]},"name":"clean-minimal"}

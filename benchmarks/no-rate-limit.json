@@ -1,0 +1,1 @@
+{"expected_checks":["no_rate_limit"],"manifest":{"prompts":[],"resources":[],"server":{"name":"docs-server","version":"1.0.0"},"tools":[{"annotations":{"readOnlyHint":true},"description":"Search the documentation index.","inputSchema":{"properties":{"q":{"maxLength":200,"type":"string"}},"type":"object"},"name":"search_docs"}]},"name":"no-rate-limit"}
