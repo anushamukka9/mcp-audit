@@ -84,6 +84,8 @@ and a decent template for how to write a manifest).
 | `weak_input_schema` | medium | Path/URL/command parameters with no schema validation |
 | `verbose_errors` | low | Stack traces and debug internals in descriptions or output schemas |
 | `no_rate_limit` | low | Tools with no rate-limit annotation |
+| `path_traversal` | high | File-reading tools with caller-supplied paths and no described traversal guard |
+| `embedded_secret` | critical/high | API keys, passwords, and key material baked into the manifest itself |
 
 Every check documents its limitations in its docstring. See
 [docs/checks.md](docs/checks.md) for the full catalog.
@@ -100,7 +102,7 @@ clean, including near-miss cases). Run them yourself:
 python -m mcp_audit.benchmark
 ```
 
-Results on the bundled set (14 manifests, 24 check activations):
+Results on the bundled set (16 manifests, 26 check activations):
 
 | check | n | precision | recall | F1 |
 |---|---|---|---|---|
@@ -114,6 +116,8 @@ Results on the bundled set (14 manifests, 24 check activations):
 | weak_input_schema | 4 | 1.00 | 1.00 | 1.00 |
 | verbose_errors | 1 | 1.00 | 1.00 | 1.00 |
 | no_rate_limit | 3 | 1.00 | 1.00 | 1.00 |
+| path_traversal | 1 | 1.00 | 1.00 | 1.00 |
+| embedded_secret | 1 | 1.00 | 1.00 | 1.00 |
 
 Take these numbers for what they are: a smoke test proving the patterns
 fire on the obvious cases, not a security certification. The set is small
@@ -135,6 +139,10 @@ Fail the build or upload SARIF to code scanning. See
   imperative descriptions will get flagged.
 - A finding is a pointer, not a verdict. Every finding carries remediation
   advice; read it, check the actual server, then decide.
+- `path_traversal` takes directory-confinement claims in the description at
+  face value and cannot see server-side validation, so a flagged tool may be
+  safe behind the scenes. `embedded_secret` cannot tell a real key from a
+  placeholder; confirm before rotating.
 - Low-severity checks (`no_rate_limit`, `verbose_errors`) are hygiene
   notes. They are noisy on purpose; tune them with a policy file rather
   than ignoring the whole report.

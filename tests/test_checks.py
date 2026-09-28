@@ -256,3 +256,125 @@ def test_empty_manifest_no_findings():
     report = audit_server({"server": {"name": "empty"}})
     assert report.findings == []
     assert report.highest_severity() is None
+
+
+def test_path_traversal_positive():
+    findings = run_check(
+        "path_traversal",
+        tool_manifest(
+            name="read_file",
+            description="Read a file from disk given its path.",
+            schema={
+                "type": "object",
+                "properties": {"path": {"type": "string", "maxLength": 4096}},
+            },
+        ),
+    )
+    assert len(findings) == 1
+    assert findings[0].severity == "high"
+    assert "tool:read_file" in findings[0].target
+
+
+def test_path_traversal_guarded_description_is_clean():
+    findings = run_check(
+        "path_traversal",
+        tool_manifest(
+            name="read_file",
+            description=(
+                "Read a file from the docs directory. Paths are sandboxed and '..' is rejected."
+            ),
+            schema={"type": "object", "properties": {"path": {"type": "string"}}},
+        ),
+    )
+    assert findings == []
+
+
+def test_path_traversal_write_tool_is_broad_tool_territory():
+    findings = run_check(
+        "path_traversal",
+        tool_manifest(
+            name="write_file",
+            description="Write data to a file at the given path.",
+            schema={"type": "object", "properties": {"path": {"type": "string"}}},
+        ),
+    )
+    assert findings == []
+
+
+def test_path_traversal_complements_weak_input_schema():
+    manifest = tool_manifest(
+        name="read_file",
+        description="Read a file from disk given its path.",
+        schema={"type": "object", "properties": {"path": {"type": "string"}}},
+    )
+    traversal = run_check("path_traversal", manifest)
+    weak = run_check("weak_input_schema", manifest)
+    assert len(traversal) == 1
+    assert len(weak) == 1
+
+
+def test_embedded_secret_uri_userinfo_is_critical():
+    manifest = {
+        "server": {"name": "s"},
+        "resources": [
+            {
+                "name": "internal-api",
+                "uri": "https://admin:not-a-real-password@api.example.com/data",
+            }
+        ],
+    }
+    findings = run_check("embedded_secret", manifest)
+    assert len(findings) == 1
+    assert findings[0].severity == "critical"
+    assert "resource:internal-api" in findings[0].target
+
+
+def test_embedded_secret_api_key_in_description():
+    findings = run_check(
+        "embedded_secret",
+        tool_manifest(
+            name="summarize",
+            description='Summarize text. Internal API key: api_key = "not-a-real-key-abc123xyz".',
+        ),
+    )
+    assert len(findings) == 1
+    assert findings[0].severity == "high"
+
+
+def test_embedded_secret_private_key_block_is_critical():
+    findings = run_check(
+        "embedded_secret",
+        tool_manifest(
+            name="deploy_key",
+            description=(
+                "Deploy helper. Key: -----BEGIN TEST PRIVATE KEY----- "
+                "TESTKEYDATA-THIS-IS-NOT-A-REAL-KEY -----END TEST PRIVATE KEY-----"
+            ),
+        ),
+    )
+    assert len(findings) == 1
+    assert findings[0].severity == "critical"
+
+
+def test_embedded_secret_mention_without_value_is_clean():
+    findings = run_check(
+        "embedded_secret",
+        tool_manifest(
+            name="summarize",
+            description="Summarize text. Pass your API key as the api_key parameter.",
+        ),
+    )
+    assert findings == []
+
+
+def test_embedded_secret_never_prints_the_value():
+    findings = run_check(
+        "embedded_secret",
+        tool_manifest(
+            name="summarize",
+            description='Summarize text. api_key = "not-a-real-key-abc123xyz".',
+        ),
+    )
+    assert len(findings) == 1
+    blob = " ".join([findings[0].title, findings[0].explanation, findings[0].remediation])
+    assert "not-a-real-key-abc123xyz" not in blob

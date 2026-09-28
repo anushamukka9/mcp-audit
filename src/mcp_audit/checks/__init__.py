@@ -1,11 +1,13 @@
-"""The ten checks, and the default set used by audit_server()."""
+"""The twelve checks, and the default set used by audit_server()."""
 
 from .base import Check
 from .broad_tool import BroadToolCheck
 from .dangerous_combo import DangerousComboCheck
 from .description_injection import DescriptionInjectionCheck
+from .embedded_secret import EmbeddedSecretCheck
 from .missing_auth import MissingAuthCheck
 from .no_rate_limit import NoRateLimitCheck
+from .path_traversal import PathTraversalCheck
 from .prompt_template_injection import PromptTemplateInjectionCheck
 from .sensitive_resource import SensitiveResourceCheck
 from .tool_impersonation import ToolImpersonationCheck
@@ -26,6 +28,8 @@ def default_checks() -> list[Check]:
         WeakInputSchemaCheck(),
         VerboseErrorsCheck(),
         NoRateLimitCheck(),
+        PathTraversalCheck(),
+        EmbeddedSecretCheck(),
     ]
 
 
@@ -41,8 +45,10 @@ __all__ = [
     "BroadToolCheck",
     "DangerousComboCheck",
     "DescriptionInjectionCheck",
+    "EmbeddedSecretCheck",
     "MissingAuthCheck",
     "NoRateLimitCheck",
+    "PathTraversalCheck",
     "PromptTemplateInjectionCheck",
     "SensitiveResourceCheck",
     "ToolImpersonationCheck",

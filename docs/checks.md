@@ -16,6 +16,8 @@ page summarizes what each one looks for and how to fix what it finds.
 | `weak_input_schema` | medium | Security-sensitive string parameters (paths, URLs, commands) with no schema validation |
 | `verbose_errors` | low | Descriptions or output schemas advertising stack traces and debug internals |
 | `no_rate_limit` | low | Tools with no rate-limit annotation |
+| `path_traversal` | high | File-reading tools with caller-supplied path parameters and no described traversal guard |
+| `embedded_secret` | critical/high | API keys, passwords, or private key material baked into tool descriptions, resource URIs, or prompts |
 
 ## Reading a finding
 
