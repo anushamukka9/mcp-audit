@@ -29,7 +29,7 @@ _GUARD = re.compile(
     r"\b(traversal|sandbox(?:ed)?|jail(?:ed)?|chroot|canonicali[sz]e[sd]?|"
     r"allowlist(?:ed)?|whitelist(?:ed)?|confined|restrict(?:ed|ion|s)?|"
     r"rejects? (?:\.\.|dot-dot))\b"
-    r"|\b(?:from|in|under|within) (?:the |a )?[\w\-/ ]*(?:directory|folder|root)\b",
+    r"|\b(?:from|in|under|within) (?:the |a )?[\w\-/ ]*(?:director(?:y|ies)|folders?|root)\b",
     re.I,
 )
 

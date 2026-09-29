@@ -124,6 +124,78 @@ fire on the obvious cases, not a security certification. The set is small
 and hand-written. Real servers are more creative than any labeled set. If
 you evaluate against your own manifests, please contribute the cases back.
 
+## Findings on real public MCP servers
+
+Labeled benchmarks are a smoke test. To see what the checks do in the
+wild, I extracted tool, resource, and prompt definitions from the source
+of four reference servers in
+[modelcontextprotocol/servers](https://github.com/modelcontextprotocol/servers)
+at commit `f46d957` (2026-09-22) and scanned them with the default policy.
+Manifests were built with a static source extractor
+(`scripts/extract_manifest.py`), so the whole thing is reproducible.
+
+| server | tools scanned | critical | high | medium | low |
+|---|---|---|---|---|---|
+| filesystem | 14 | 0 | 2 | 15 | 14 |
+| memory | 9 | 0 | 0 | 5 | 9 |
+| fetch | 1 | 0 | 1 | 0 | 1 |
+| git | 12 | 0 | 0 | 1 | 12 |
+
+What the findings actually mean, server by server:
+
+**filesystem** (31 findings). The two highs are `broad_tool` on
+`write_file` and `create_directory`: they write to caller-supplied paths,
+which is the tool's entire job, and the server confines them to allowed
+directories via `validatePath` in `path-validation.ts`. By design,
+flagged so you confirm the confinement. The mediums split into
+`missing_auth` on the four mutating tools (they carry `readOnlyHint` but
+no auth annotation, so clients cannot tell if calls are access
+controlled) and `weak_input_schema` on the bare-string `path` parameters
+(schema-level validation is absent; the server validates behind the
+scenes, which the check cannot see). The 14 lows are `no_rate_limit`
+hygiene notes.
+
+**memory** (14 findings). Five `missing_auth` mediums on the mutating
+knowledge-graph tools (`create_entities`, `create_relations`,
+`delete_entities`, `delete_observations`, `delete_relations`), nine
+`no_rate_limit` lows. Otherwise clean: no injection, no broad tools, no
+secrets. Note that `add_observations` escaped `missing_auth` for the same
+reason as git's commit tools below: "add" is not in the mutating-word
+list either.
+
+**fetch** (2 findings). One `broad_tool` high: it fetches arbitrary URLs
+with no allowlist, which is the tool's stated purpose (it honors
+robots.txt server-side). One `no_rate_limit` low. The `url` parameter
+carries `AnyUrl` typing, so `weak_input_schema` correctly stays quiet.
+
+**git** (13 findings). Twelve `no_rate_limit` lows and one
+`missing_auth` medium on `git_reset` (it sets `destructiveHint` with no
+auth annotation). Worth noting: `git_commit`, `git_add`, and
+`git_checkout` did not flag because the mutating-word list does not
+include verbs like "commit", "stage", or "checkout". That is a real
+coverage gap in `missing_auth`, documented here instead of hidden.
+
+Two things did not fire anywhere: `description_injection`,
+`embedded_secret`, `tool_impersonation`, `dangerous_combo`,
+`sensitive_resource`, `verbose_errors`, and `prompt_template_injection`
+came back clean on all four servers.
+
+The most useful result was a bug in mcp-audit itself. The first scan
+flagged `path_traversal` on `read_text_file`, `read_media_file`, and
+`directory_tree`, even though every one of those descriptions ends with
+"Only works within allowed directories" and the server genuinely
+validates paths. Root cause: the guard pattern recognized "directory"
+but not "directories". Fixed in 0.2.1 (plural handling plus a regression
+test); those three findings clear after the fix. This is exactly why you
+run your own tool against the real world.
+
+Read this section the way the tool intends: static, lint-level
+observations, not CVEs and not vulnerability disclosures. Several
+findings describe capabilities that are intentional. The annotation
+checks (`missing_auth`, `no_rate_limit`) are noisy across the ecosystem
+because servers rarely populate that metadata. A finding is a pointer;
+check the server, then decide.
+
 ## CI usage
 
 Fail the build or upload SARIF to code scanning. See

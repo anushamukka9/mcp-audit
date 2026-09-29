@@ -301,6 +301,23 @@ def test_path_traversal_write_tool_is_broad_tool_territory():
     assert findings == []
 
 
+def test_path_traversal_plural_directories_guard_is_clean():
+    # Regression: real-world descriptions say "within allowed directories"
+    # (plural). The guard pattern must recognize it.
+    findings = run_check(
+        "path_traversal",
+        tool_manifest(
+            name="read_text_file",
+            description=(
+                "Read the complete contents of a file from the file system as text. "
+                "Only works within allowed directories."
+            ),
+            schema={"type": "object", "properties": {"path": {"type": "string"}}},
+        ),
+    )
+    assert findings == []
+
+
 def test_path_traversal_complements_weak_input_schema():
     manifest = tool_manifest(
         name="read_file",
