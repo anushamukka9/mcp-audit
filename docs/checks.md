@@ -18,6 +18,8 @@ page summarizes what each one looks for and how to fix what it finds.
 | `no_rate_limit` | low | Tools with no rate-limit annotation |
 | `path_traversal` | high | File-reading tools with caller-supplied path parameters and no described traversal guard |
 | `embedded_secret` | critical/high | API keys, passwords, or private key material baked into tool descriptions, resource URIs, or prompts |
+| `approval_bypass` | high | Descriptions that nudge the agent to skip human approval ("auto-approve", "no need to ask", "trusted, no approval needed") |
+| `credential_request` | high | Input schemas asking the caller to supply credentials (passwords, API keys, tokens) through parameters the model must fill |
 
 ## Reading a finding
 

@@ -86,6 +86,8 @@ and a decent template for how to write a manifest).
 | `no_rate_limit` | low | Tools with no rate-limit annotation |
 | `path_traversal` | high | File-reading tools with caller-supplied paths and no described traversal guard |
 | `embedded_secret` | critical/high | API keys, passwords, and key material baked into the manifest itself |
+| `approval_bypass` | high | Descriptions that tell the agent no human confirmation is needed ("auto-approve", "no need to ask") |
+| `credential_request` | high | Input schemas asking the caller to supply passwords, API keys, or tokens |
 
 Every check documents its limitations in its docstring. See
 [docs/checks.md](docs/checks.md) for the full catalog.
@@ -102,7 +104,7 @@ clean, including near-miss cases). Run them yourself:
 python -m mcp_audit.benchmark
 ```
 
-Results on the bundled set (16 manifests, 26 check activations):
+Results on the bundled set (18 manifests, 28 check activations):
 
 | check | n | precision | recall | F1 |
 |---|---|---|---|---|
@@ -118,6 +120,8 @@ Results on the bundled set (16 manifests, 26 check activations):
 | no_rate_limit | 3 | 1.00 | 1.00 | 1.00 |
 | path_traversal | 1 | 1.00 | 1.00 | 1.00 |
 | embedded_secret | 1 | 1.00 | 1.00 | 1.00 |
+| approval_bypass | 1 | 1.00 | 1.00 | 1.00 |
+| credential_request | 1 | 1.00 | 1.00 | 1.00 |
 
 Take these numbers for what they are: a smoke test proving the patterns
 fire on the obvious cases, not a security certification. The set is small
@@ -215,6 +219,11 @@ Fail the build or upload SARIF to code scanning. See
   face value and cannot see server-side validation, so a flagged tool may be
   safe behind the scenes. `embedded_secret` cannot tell a real key from a
   placeholder; confirm before rotating.
+- `approval_bypass` is phrase matching and will flag harmless read-only
+  tools whose authors wrote "no confirmation needed" as a courtesy.
+  `credential_request` skips tools that present themselves as
+  authentication and does not inspect nested schemas; a hit means "read
+  this tool", not "this tool is phishing".
 - Low-severity checks (`no_rate_limit`, `verbose_errors`) are hygiene
   notes. They are noisy on purpose; tune them with a policy file rather
   than ignoring the whole report.

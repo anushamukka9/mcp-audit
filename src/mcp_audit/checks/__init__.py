@@ -1,7 +1,9 @@
-"""The twelve checks, and the default set used by audit_server()."""
+"""The fourteen checks, and the default set used by audit_server()."""
 
+from .approval_bypass import ApprovalBypassCheck
 from .base import Check
 from .broad_tool import BroadToolCheck
+from .credential_request import CredentialRequestCheck
 from .dangerous_combo import DangerousComboCheck
 from .description_injection import DescriptionInjectionCheck
 from .embedded_secret import EmbeddedSecretCheck
@@ -19,6 +21,7 @@ def default_checks() -> list[Check]:
     """All checks, in a stable order."""
     return [
         DescriptionInjectionCheck(),
+        ApprovalBypassCheck(),
         BroadToolCheck(),
         MissingAuthCheck(),
         DangerousComboCheck(),
@@ -30,6 +33,7 @@ def default_checks() -> list[Check]:
         NoRateLimitCheck(),
         PathTraversalCheck(),
         EmbeddedSecretCheck(),
+        CredentialRequestCheck(),
     ]
 
 
@@ -42,7 +46,9 @@ def check_by_id(check_id: str) -> Check | None:
 
 __all__ = [
     "Check",
+    "ApprovalBypassCheck",
     "BroadToolCheck",
+    "CredentialRequestCheck",
     "DangerousComboCheck",
     "DescriptionInjectionCheck",
     "EmbeddedSecretCheck",
