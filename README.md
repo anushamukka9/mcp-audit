@@ -30,15 +30,15 @@ pip install mcp-audit
 ```bash
 $ mcp-audit scan manifest.json
 
-mcp-audit: acme-ops-server - 18 finding(s)
-severity: critical=3, high=4, medium=6, low=5
+mcp-audit: acme-ops-server - 20 finding(s)
+severity: critical=3, high=6, medium=6, low=5
 
 [CRITICAL] tool:run_shell
            Tool 'run_shell' allows arbitrary shell execution (broad_tool)
 [CRITICAL] resource:app-env
            Resource 'app-env' points at credentials or keys (sensitive_resource)
-[HIGH    ] server:run_shell + post_webhook
-           Download-and-execute pair: 'run_shell' runs commands, 'post_webhook' reaches the network (dangerous_combo)
+[HIGH    ] server:app-env + post_webhook
+           Exfiltration path: resource 'app-env' holds sensitive data, tool 'post_webhook' reaches the network (exfiltration_path)
 ...
 ```
 
@@ -64,11 +64,25 @@ Machine-readable output for CI:
 mcp-audit scan manifest.json --format json      # JSON report
 mcp-audit scan manifest.json --format sarif     # GitHub code scanning
 mcp-audit scan manifest.json --format markdown  # paste into a PR
+mcp-audit scan manifest.json --format html      # standalone page to share
 ```
 
-Try it on the bundled examples: `examples/vulnerable_manifest.json` (18
+From Python, every format is one call away:
+
+```python
+from mcp_audit.report import format_report
+
+html = format_report(report, "html")
+```
+
+Try it on the bundled examples: `examples/vulnerable_manifest.json` (20
 findings on purpose) and `examples/clean_manifest.json` (zero findings,
-and a decent template for how to write a manifest).
+and a decent template for how to write a manifest). For the full
+walkthrough, `examples/audit_fixture_server.py` extracts a manifest from
+the deliberately vulnerable server in `fixtures/vulnerable_server/` and
+audits it: all 18 checks fire, 42 findings, which makes the fixture the
+nastiest test asset in the repo. Open the fixture source next to the
+output to see each issue in the code that caused it.
 
 ## Checks
 
@@ -88,6 +102,22 @@ and a decent template for how to write a manifest).
 | `embedded_secret` | critical/high | API keys, passwords, and key material baked into the manifest itself |
 | `approval_bypass` | high | Descriptions that tell the agent no human confirmation is needed ("auto-approve", "no need to ask") |
 | `credential_request` | high | Input schemas asking the caller to supply passwords, API keys, or tokens |
+| `elevated_privilege` | high/medium | Privilege claims (root/sudo/bypassed permission checks, high) and over-broad scope (wildcard resources, "any file", medium) |
+| `exfiltration_path` | high | A sensitive resource on a server that also ships a network-capable tool: a complete exfiltration path with no reader tool needed |
+| `privilege_mixing` | medium | Some state-changing tools carry auth annotations while others do not |
+| `prompt_reads_sensitive` | high | Prompt templates referencing sensitive file paths or instructing the model to read secrets |
+
+Every severity comes with a rationale: each check documents why its
+findings get their severity (`Check.severity_rationale`, surfaced as
+`Finding.severity_rationale`, in the JSON output, and in the markdown and
+HTML reports). A severity is never a bare label you have to take on
+faith. And when the default rating does not fit your server, remap it
+per check with `severity_overrides` in the policy file instead of
+disabling the check:
+
+```json
+{ "severity_overrides": { "no_rate_limit": "medium" } }
+```
 
 Every check documents its limitations in its docstring. See
 [docs/checks.md](docs/checks.md) for the full catalog.
@@ -104,15 +134,15 @@ clean, including near-miss cases). Run them yourself:
 python -m mcp_audit.benchmark
 ```
 
-Results on the bundled set (18 manifests, 28 check activations):
+Results on the bundled set (22 manifests, 34 check activations):
 
 | check | n | precision | recall | F1 |
 |---|---|---|---|---|
 | description_injection | 2 | 1.00 | 1.00 | 1.00 |
 | broad_tool | 4 | 1.00 | 1.00 | 1.00 |
-| missing_auth | 4 | 1.00 | 1.00 | 1.00 |
+| missing_auth | 5 | 1.00 | 1.00 | 1.00 |
 | dangerous_combo | 1 | 1.00 | 1.00 | 1.00 |
-| sensitive_resource | 2 | 1.00 | 1.00 | 1.00 |
+| sensitive_resource | 3 | 1.00 | 1.00 | 1.00 |
 | prompt_template_injection | 2 | 1.00 | 1.00 | 1.00 |
 | tool_impersonation | 1 | 1.00 | 1.00 | 1.00 |
 | weak_input_schema | 4 | 1.00 | 1.00 | 1.00 |
@@ -122,6 +152,10 @@ Results on the bundled set (18 manifests, 28 check activations):
 | embedded_secret | 1 | 1.00 | 1.00 | 1.00 |
 | approval_bypass | 1 | 1.00 | 1.00 | 1.00 |
 | credential_request | 1 | 1.00 | 1.00 | 1.00 |
+| elevated_privilege | 1 | 1.00 | 1.00 | 1.00 |
+| exfiltration_path | 1 | 1.00 | 1.00 | 1.00 |
+| privilege_mixing | 1 | 1.00 | 1.00 | 1.00 |
+| prompt_reads_sensitive | 1 | 1.00 | 1.00 | 1.00 |
 
 Take these numbers for what they are: a smoke test proving the patterns
 fire on the obvious cases, not a security certification. The set is small
@@ -224,6 +258,16 @@ Fail the build or upload SARIF to code scanning. See
   `credential_request` skips tools that present themselves as
   authentication and does not inspect nested schemas; a hit means "read
   this tool", not "this tool is phishing".
+- `elevated_privilege` filters negated phrasing ("does not require admin
+  privileges") but will still flag tools that honestly need privilege, and
+  it cannot tell whether the privilege is enforced server-side.
+  `privilege_mixing` fires on annotation inconsistency, which is often a
+  documentation problem, not an access-control one.
+- `exfiltration_path` and `prompt_reads_sensitive` read the manifest, not
+  the server: a flagged resource may not actually be served, and a
+  template that mentions a `.env` file in passing ("never commit your
+  .env") will flag. The sensitive-path branch requires a path shape, so
+  the bare word "credentials" in prose does not count.
 - Low-severity checks (`no_rate_limit`, `verbose_errors`) are hygiene
   notes. They are noisy on purpose; tune them with a policy file rather
   than ignoring the whole report.
@@ -232,10 +276,11 @@ Fail the build or upload SARIF to code scanning. See
 
 - Manifest builder that extracts tools/resources/prompts from a live MCP
   server over stdio, so you can audit without hand-writing JSON
-- Severity weighting per check in the policy file
-- More pair checks (auth tool + anonymous tool on the same server, prompt
-  that reads a sensitive resource)
+- More pair checks (prompt that reads a sensitive resource is done;
+  remaining: auth tool + anonymous tool on the same server)
 - Larger, community-sourced benchmark manifests
+- Finding deduplication across overlapping checks (e.g. a shell tool
+  flagged by both `broad_tool` and `elevated_privilege`)
 
 ## License
 
