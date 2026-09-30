@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mcp-audit"
-version = "0.3.0"
+version = "0.4.0"
 description = "Security auditing for MCP servers: scan tool, resource, and prompt manifests for injection surfaces, over-broad tools, exposed secrets, and more. Deterministic, no model calls."
 readme = "README.md"
 license = { text = "MIT" }
