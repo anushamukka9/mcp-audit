@@ -12,6 +12,9 @@ policy file and pass it with `--config`.
   "disabled_checks": ["no_rate_limit"],
   "allowlist": {
     "weak_input_schema": ["tool:search_docs"]
+  },
+  "severity_overrides": {
+    "no_rate_limit": "medium"
   }
 }
 ```
@@ -23,6 +26,12 @@ policy file and pass it with `--config`.
 - **allowlist**: per-check lists of targets to skip, as `tool:name`,
   `resource:name`, `prompt:name`, or `server:a + b`. Use this for findings
   you have reviewed and accepted.
+- **severity_overrides**: per-check severity remapping, as
+  `{check_id: severity}`. Applied to findings before the `fail_on` decision.
+  Use it to quiet a noisy check (lower `no_rate_limit` to `low` on an
+  internal server) or to promote one you care about. This changes the
+  rating, not the underlying finding, and the finding keeps its original
+  `severity_rationale` so the change stays reviewable.
 
 ## Same knobs in Python
 
@@ -33,6 +42,7 @@ policy = AuditPolicy(
     fail_on="medium",
     disabled_checks=["verbose_errors"],
     allowlist={"no_rate_limit": ["tool:search_docs"]},
+    severity_overrides={"no_rate_limit": "low"},
 )
 report = audit_server(manifest, policy=policy)
 print("passed:", policy.passes(report))
