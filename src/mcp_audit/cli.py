@@ -6,9 +6,9 @@ import argparse
 import json
 import sys
 
-from . import __version__, audit_server, default_checks
-from .core import AuditReport
+from . import __version__, audit_server
 from .policy import AuditPolicy
+from .report import _FORMATS, format_report
 
 
 def _load_manifest(path: str) -> dict:
@@ -30,78 +30,6 @@ def _load_policy(path: str | None, fail_on: str | None) -> AuditPolicy:
     return policy
 
 
-def format_table(report: AuditReport) -> str:
-    lines = [f"mcp-audit: {report.manifest_name} - {len(report.findings)} finding(s)"]
-    counts = report.counts()
-    lines.append("severity: " + ", ".join(f"{sev}={counts[sev]}" for sev in counts))
-    lines.append("")
-    if not report.findings:
-        lines.append("No findings. Nice manifest.")
-        return "\n".join(lines)
-    for finding in report.findings:
-        lines.append(f"[{finding.severity.upper():8}] {finding.target}")
-        lines.append(f"           {finding.title} ({finding.check_id})")
-    return "\n".join(lines)
-
-
-def format_markdown(report: AuditReport) -> str:
-    lines = [f"# mcp-audit: {report.manifest_name}", ""]
-    counts = report.counts()
-    lines.append(" | ".join(f"{sev}: {counts[sev]}" for sev in counts))
-    lines.append("")
-    if not report.findings:
-        lines.append("No findings.")
-        return "\n".join(lines)
-    for finding in report.findings:
-        lines.append(f"## [{finding.severity}] {finding.title}")
-        lines.append(f"Target: `{finding.target}` - check: `{finding.check_id}`")
-        lines.append("")
-        lines.append(finding.explanation)
-        lines.append("")
-        lines.append(f"**Fix:** {finding.remediation}")
-        lines.append("")
-    return "\n".join(lines)
-
-
-_SARIF_LEVELS = {"critical": "error", "high": "error", "medium": "warning", "low": "note"}
-
-
-def _sarif_level(severity: str) -> str:
-    return _SARIF_LEVELS[severity]
-
-
-def format_sarif(report: AuditReport) -> str:
-    """Minimal SARIF 2.1.0 output for CI code-scanning ingestion."""
-    rules = [
-        {
-            "id": check.id,
-            "name": check.title,
-            "shortDescription": {"text": check.description},
-        }
-        for check in default_checks()
-    ]
-    results = [
-        {
-            "ruleId": f.check_id,
-            "level": _sarif_level(f.severity),
-            "message": {"text": f"{f.title}: {f.explanation}"},
-            "locations": [{"physicalLocation": {"artifactLocation": {"uri": f.target}}}],
-        }
-        for f in report.findings
-    ]
-    sarif = {
-        "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
-        "version": "2.1.0",
-        "runs": [
-            {
-                "tool": {"driver": {"name": "mcp-audit", "version": __version__, "rules": rules}},
-                "results": results,
-            }
-        ],
-    }
-    return json.dumps(sarif, indent=2)
-
-
 def cmd_scan(args: argparse.Namespace) -> int:
     try:
         manifest = _load_manifest(args.manifest)
@@ -116,14 +44,7 @@ def cmd_scan(args: argparse.Namespace) -> int:
 
     report = audit_server(manifest, policy=policy)
 
-    if args.format == "json":
-        print(json.dumps(report.to_dict(), indent=2))
-    elif args.format == "sarif":
-        print(format_sarif(report))
-    elif args.format == "markdown":
-        print(format_markdown(report))
-    else:
-        print(format_table(report))
+    print(format_report(report, args.format))
 
     if not policy.passes(report):
         print(
@@ -146,7 +67,7 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("manifest", help="Path to the server manifest JSON file.")
     scan.add_argument(
         "--format",
-        choices=["table", "json", "sarif", "markdown"],
+        choices=list(_FORMATS),
         default="table",
         help="Output format (default: table).",
     )
