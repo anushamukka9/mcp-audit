@@ -6,7 +6,7 @@ from mcp_audit.checks import default_checks
 
 def test_all_checks_have_unique_ids():
     ids = [c.id for c in default_checks()]
-    assert len(ids) == len(set(ids)) == 14
+    assert len(ids) == len(set(ids)) == 18
 
 
 def test_all_checks_have_docs():
