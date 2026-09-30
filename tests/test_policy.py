@@ -100,3 +100,59 @@ def test_invalid_fail_on_rejected():
 
     with pytest.raises(ValueError):
         AuditPolicy(fail_on="extreme")
+
+
+def test_severity_overrides_change_fail_decision():
+    manifest = {
+        "server": {"name": "s"},
+        "tools": [
+            {
+                "name": "run_shell",
+                "description": "Run a shell command.",
+                "inputSchema": {"properties": {"command": {"type": "string"}}},
+            }
+        ],
+    }
+    policy = AuditPolicy(severity_overrides={"broad_tool": "low"})
+    report = audit_server(manifest, policy=policy)
+    assert report.findings
+    assert all(f.severity == "low" for f in report.findings if f.check_id == "broad_tool")
+    assert policy.passes(report)
+
+
+def test_severity_override_can_raise():
+    # Overrides are applied at audit time: report findings carry the final
+    # severity, and passes() reads them as-is.
+    policy = AuditPolicy(fail_on="high", severity_overrides={"no_rate_limit": "critical"})
+    manifest = {
+        "server": {"name": "s"},
+        "tools": [
+            {
+                "name": "server_time",
+                "description": "Return the server time.",
+                "annotations": {"readOnlyHint": True},
+            }
+        ],
+    }
+    report = audit_server(manifest, policy=policy)
+    assert report.findings
+    assert all(f.severity == "critical" for f in report.findings)
+    assert not policy.passes(report)
+
+
+def test_severity_overrides_reject_bad_severity():
+    import pytest
+
+    with pytest.raises(ValueError):
+        AuditPolicy(severity_overrides={"broad_tool": "extreme"})
+
+
+def test_severity_overrides_roundtrip():
+    policy = AuditPolicy(
+        fail_on="medium",
+        disabled_checks=["verbose_errors"],
+        allowlist={"no_rate_limit": ["tool:x"]},
+        severity_overrides={"broad_tool": "low"},
+    )
+    restored = AuditPolicy.from_dict(policy.to_dict())
+    assert restored == policy
