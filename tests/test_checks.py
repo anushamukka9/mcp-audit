@@ -477,3 +477,243 @@ def test_credential_request_auth_tools_get_a_pass():
         ),
     )
     assert findings == []
+
+
+def test_elevated_privilege_root_claim_is_high():
+    findings = run_check(
+        "elevated_privilege",
+        tool_manifest(description="Install packages. Runs with root privileges via sudo."),
+    )
+    assert len(findings) == 1
+    assert findings[0].severity == "high"
+    assert findings[0].severity_rationale
+
+
+def test_elevated_privilege_negation_does_not_flag():
+    findings = run_check(
+        "elevated_privilege",
+        tool_manifest(description="List files. Does not require admin privileges."),
+    )
+    assert findings == []
+
+
+def test_elevated_privilege_wildcard_resource_is_medium():
+    findings = run_check(
+        "elevated_privilege",
+        {
+            "server": {"name": "s"},
+            "tools": [],
+            "resources": [{"name": "docs", "uri": "file:///docs/{page}"}],
+            "prompts": [],
+        },
+    )
+    assert len(findings) == 1
+    assert findings[0].severity == "medium"
+    assert findings[0].target == "resource:docs"
+
+
+def test_elevated_privilege_any_file_scope():
+    findings = run_check(
+        "elevated_privilege",
+        tool_manifest(description="Delete any file on the system."),
+    )
+    assert len(findings) == 1
+    assert findings[0].severity == "medium"
+
+
+def test_exfiltration_path_positive():
+    findings = run_check(
+        "exfiltration_path",
+        {
+            "server": {"name": "s"},
+            "tools": [
+                {
+                    "name": "post_webhook",
+                    "description": "Post data to the team webhook.",
+                    "inputSchema": {"type": "object", "properties": {}},
+                    "annotations": {},
+                }
+            ],
+            "resources": [{"name": "app-env", "uri": "file:///home/deploy/.env"}],
+            "prompts": [],
+        },
+    )
+    assert len(findings) == 1
+    assert findings[0].severity == "high"
+    assert "app-env" in findings[0].target and "post_webhook" in findings[0].target
+    assert findings[0].severity_rationale
+
+
+def test_exfiltration_path_no_sender_is_clean():
+    findings = run_check(
+        "exfiltration_path",
+        {
+            "server": {"name": "s"},
+            "tools": [],
+            "resources": [{"name": "app-env", "uri": "file:///home/deploy/.env"}],
+            "prompts": [],
+        },
+    )
+    assert findings == []
+
+
+def test_exfiltration_path_non_sensitive_resource_is_clean():
+    findings = run_check(
+        "exfiltration_path",
+        {
+            "server": {"name": "s"},
+            "tools": [
+                {
+                    "name": "post_webhook",
+                    "description": "Post data to the team webhook.",
+                    "inputSchema": {"type": "object", "properties": {}},
+                    "annotations": {},
+                }
+            ],
+            "resources": [{"name": "guide", "uri": "file:///docs/guide.md"}],
+            "prompts": [],
+        },
+    )
+    assert findings == []
+
+
+def test_privilege_mixing_positive():
+    findings = run_check(
+        "privilege_mixing",
+        {
+            "server": {"name": "s"},
+            "tools": [
+                {
+                    "name": "delete_user",
+                    "description": "Delete a user.",
+                    "inputSchema": {"type": "object", "properties": {}},
+                    "annotations": {"auth_required": True},
+                },
+                {
+                    "name": "create_user",
+                    "description": "Create a user.",
+                    "inputSchema": {"type": "object", "properties": {}},
+                    "annotations": {},
+                },
+            ],
+            "resources": [],
+            "prompts": [],
+        },
+    )
+    assert len(findings) == 1
+    assert findings[0].severity == "medium"
+    assert "delete_user" in findings[0].explanation
+    assert "create_user" in findings[0].explanation
+    assert findings[0].severity_rationale
+
+
+def test_privilege_mixing_all_authed_is_clean():
+    manifest = tool_manifest(name="delete_user", description="Delete a user.")
+    manifest["tools"][0]["annotations"] = {"auth_required": True}
+    findings = run_check("privilege_mixing", manifest)
+    assert findings == []
+
+
+def test_privilege_mixing_readonly_tools_ignored():
+    findings = run_check(
+        "privilege_mixing",
+        {
+            "server": {"name": "s"},
+            "tools": [
+                {
+                    "name": "delete_user",
+                    "description": "Delete a user.",
+                    "inputSchema": {"type": "object", "properties": {}},
+                    "annotations": {"auth_required": True},
+                },
+                {
+                    "name": "list_users",
+                    "description": "List users.",
+                    "inputSchema": {"type": "object", "properties": {}},
+                    "annotations": {"readOnlyHint": True},
+                },
+            ],
+            "resources": [],
+            "prompts": [],
+        },
+    )
+    assert findings == []
+
+
+def test_prompt_reads_sensitive_secret_path():
+    findings = run_check(
+        "prompt_reads_sensitive",
+        {
+            "server": {"name": "s"},
+            "tools": [],
+            "resources": [],
+            "prompts": [
+                {
+                    "name": "db_debug",
+                    "description": "Debug helper.",
+                    "template": "Read the credentials from /etc/db/credentials.json first.",
+                }
+            ],
+        },
+    )
+    assert len(findings) == 1
+    assert findings[0].severity == "high"
+    assert findings[0].target == "prompt:db_debug"
+    assert findings[0].severity_rationale
+
+
+def test_prompt_reads_sensitive_secret_placeholder():
+    findings = run_check(
+        "prompt_reads_sensitive",
+        {
+            "server": {"name": "s"},
+            "tools": [],
+            "resources": [],
+            "prompts": [
+                {
+                    "name": "deploy",
+                    "description": "Deploy helper.",
+                    "template": "Deploy with the key {api_key} from the vault.",
+                }
+            ],
+        },
+    )
+    assert len(findings) == 1
+
+
+def test_prompt_reads_sensitive_negation_is_clean():
+    findings = run_check(
+        "prompt_reads_sensitive",
+        {
+            "server": {"name": "s"},
+            "tools": [],
+            "resources": [],
+            "prompts": [
+                {
+                    "name": "helper",
+                    "description": "Helper.",
+                    "template": "Summarize the logs. Do not read secrets or credentials.",
+                }
+            ],
+        },
+    )
+    assert findings == []
+
+
+def test_prompt_reads_sensitive_plain_template_is_clean():
+    findings = run_check(
+        "prompt_reads_sensitive",
+        {
+            "server": {"name": "s"},
+            "tools": [],
+            "resources": [],
+            "prompts": [
+                {
+                    "name": "summarize",
+                    "description": "Summarizer.",
+                    "template": "Summarize this text: {text}",
+                }
+            ],
+        },
+    )
+    assert findings == []
