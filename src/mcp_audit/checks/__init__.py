@@ -1,4 +1,4 @@
-"""The fourteen checks, and the default set used by audit_server()."""
+"""The eighteen checks, and the default set used by audit_server()."""
 
 from .approval_bypass import ApprovalBypassCheck
 from .base import Check
@@ -6,10 +6,14 @@ from .broad_tool import BroadToolCheck
 from .credential_request import CredentialRequestCheck
 from .dangerous_combo import DangerousComboCheck
 from .description_injection import DescriptionInjectionCheck
+from .elevated_privilege import ElevatedPrivilegeCheck
 from .embedded_secret import EmbeddedSecretCheck
+from .exfiltration_path import ExfiltrationPathCheck
 from .missing_auth import MissingAuthCheck
 from .no_rate_limit import NoRateLimitCheck
 from .path_traversal import PathTraversalCheck
+from .privilege_mixing import PrivilegeMixingCheck
+from .prompt_reads_sensitive import PromptReadsSensitiveCheck
 from .prompt_template_injection import PromptTemplateInjectionCheck
 from .sensitive_resource import SensitiveResourceCheck
 from .tool_impersonation import ToolImpersonationCheck
@@ -34,6 +38,10 @@ def default_checks() -> list[Check]:
         PathTraversalCheck(),
         EmbeddedSecretCheck(),
         CredentialRequestCheck(),
+        ElevatedPrivilegeCheck(),
+        ExfiltrationPathCheck(),
+        PrivilegeMixingCheck(),
+        PromptReadsSensitiveCheck(),
     ]
 
 
@@ -51,10 +59,14 @@ __all__ = [
     "CredentialRequestCheck",
     "DangerousComboCheck",
     "DescriptionInjectionCheck",
+    "ElevatedPrivilegeCheck",
     "EmbeddedSecretCheck",
+    "ExfiltrationPathCheck",
     "MissingAuthCheck",
     "NoRateLimitCheck",
     "PathTraversalCheck",
+    "PrivilegeMixingCheck",
+    "PromptReadsSensitiveCheck",
     "PromptTemplateInjectionCheck",
     "SensitiveResourceCheck",
     "ToolImpersonationCheck",
