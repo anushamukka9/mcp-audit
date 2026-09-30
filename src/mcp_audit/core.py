@@ -48,11 +48,13 @@ class Finding:
     title: str
     explanation: str
     remediation: str
+    severity_rationale: str = ""
 
     def to_dict(self) -> dict:
         return {
             "check_id": self.check_id,
             "severity": self.severity,
+            "severity_rationale": self.severity_rationale,
             "target": self.target,
             "title": self.title,
             "explanation": self.explanation,
@@ -97,6 +99,10 @@ class Check(ABC):
     title: str = ""
     description: str = ""
     default_severity: str = MEDIUM
+    #: One or two sentences explaining why findings from this check get
+    #: their severity. Surfaced in Finding.severity_rationale and the
+    #: markdown/HTML reports so the rating is never a bare label.
+    severity_rationale: str = ""
 
     def tools(self, manifest: dict) -> list[dict]:
         return manifest.get("tools", []) or []
@@ -127,4 +133,5 @@ class Check(ABC):
             title=title,
             explanation=explanation,
             remediation=remediation,
+            severity_rationale=self.severity_rationale,
         )
