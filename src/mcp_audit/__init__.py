@@ -28,7 +28,7 @@ from .core import (
 )
 from .policy import AuditPolicy
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 
 def audit_server(
@@ -50,6 +50,7 @@ def audit_server(
             continue
         for finding in check.run(manifest):
             if not policy.target_allowed(finding.check_id, finding.target):
+                finding.severity = policy.severity_for(finding.check_id, finding.severity)
                 findings.append(finding)
     findings.sort(key=lambda f: (SEVERITIES.index(f.severity), f.check_id, f.target))
     return AuditReport(manifest_name=name, findings=findings)
