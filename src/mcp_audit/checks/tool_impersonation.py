@@ -31,6 +31,11 @@ class ToolImpersonationCheck(Check):
         "more trustworthy than it is."
     )
     default_severity = "medium"
+    severity_rationale = (
+        "Medium because a name is cosmetic: it proves nothing about what the tool does, and "
+        "renaming is cheap. But borrowed authority works on models and users alike, and a "
+        "malicious server will use it to get picked first."
+    )
 
     def run(self, manifest: dict) -> list[Finding]:
         findings: list[Finding] = []

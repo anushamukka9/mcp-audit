@@ -49,6 +49,11 @@ class EmbeddedSecretCheck(Check):
         "descriptions or URIs leak the moment the manifest is shared."
     )
     default_severity = "high"
+    severity_rationale = (
+        "High because manifests travel: they get committed to git, pasted into chat windows, and "
+        "posted in issues. A key in the manifest is already shared. The only question is who "
+        "already has it."
+    )
 
     def _scan(self, target: str, name: str, text: str, uri: str = "") -> list[Finding]:
         findings: list[Finding] = []

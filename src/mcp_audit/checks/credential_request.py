@@ -60,6 +60,11 @@ class CredentialRequestCheck(Check):
         "tool into a credential handoff point."
     )
     default_severity = "high"
+    severity_rationale = (
+        "High because every such parameter is a phishing surface with built-in delivery: the "
+        "model fills it from whatever credentials it can reach, and the user may never see the "
+        "handoff."
+    )
 
     def run(self, manifest: dict) -> list[Finding]:
         findings: list[Finding] = []

@@ -70,6 +70,10 @@ class ApprovalBypassCheck(Check):
         "the human-in-the-loop boundary."
     )
     default_severity = "high"
+    severity_rationale = (
+        "High because it removes the one checkpoint an attacker cannot click through: the human. "
+        "A tool that talks its way past approval runs exactly when the user is not watching."
+    )
 
     def run(self, manifest: dict) -> list[Finding]:
         findings: list[Finding] = []

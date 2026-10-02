@@ -54,6 +54,11 @@ class DescriptionInjectionCheck(Check):
         "hidden in them can steer the model."
     )
     default_severity = "high"
+    severity_rationale = (
+        "High because descriptions are shown to the model every time the tool is offered. A "
+        "single injected instruction rides along with normal use, no special request needed, "
+        "which makes it the cheapest attack surface on the server."
+    )
 
     def run(self, manifest: dict) -> list[Finding]:
         findings: list[Finding] = []

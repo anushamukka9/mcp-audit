@@ -42,6 +42,11 @@ class PathTraversalCheck(Check):
         "traversal guard invite directory traversal."
     )
     default_severity = "high"
+    severity_rationale = (
+        "High because traversal is the flaw I see most often in real MCP servers, and the payoff "
+        "is the whole filesystem. A read_file tool with an unguarded path hands the model a key "
+        "to every file on the host."
+    )
 
     def run(self, manifest: dict) -> list[Finding]:
         findings: list[Finding] = []

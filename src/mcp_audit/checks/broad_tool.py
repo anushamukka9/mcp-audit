@@ -40,6 +40,11 @@ class BroadToolCheck(Check):
         "give a compromised or confused model far too much room."
     )
     default_severity = "high"
+    severity_rationale = (
+        "High because capability is destiny. A prompt injection that reaches a shell-exec tool is "
+        "a compromise; one that reaches a well-scoped lookup tool is a bad answer. The blast "
+        "radius here is set by the tool, not the attack."
+    )
 
     def run(self, manifest: dict) -> list[Finding]:
         findings: list[Finding] = []

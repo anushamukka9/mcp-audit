@@ -31,6 +31,10 @@ class SensitiveResourceCheck(Check):
         "system files put secrets one tool call away."
     )
     default_severity = "high"
+    severity_rationale = (
+        "High because resources are directly model-readable: no tool call, no approval step. A "
+        "URI pointing at a private key puts the secret one steered request away from disclosure."
+    )
 
     def run(self, manifest: dict) -> list[Finding]:
         findings: list[Finding] = []

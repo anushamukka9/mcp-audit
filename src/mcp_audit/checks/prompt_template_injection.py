@@ -37,6 +37,11 @@ class PromptTemplateInjectionCheck(Check):
         "override-style language themselves, are easy injection targets."
     )
     default_severity = "high"
+    severity_rationale = (
+        "High because templates run with model privileges and mix trusted instructions with "
+        "untrusted input. A template that embeds raw user input next to instructions fires during "
+        "normal use, not just under attack."
+    )
 
     def run(self, manifest: dict) -> list[Finding]:
         findings: list[Finding] = []

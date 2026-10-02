@@ -29,6 +29,11 @@ class DangerousComboCheck(Check):
         "even when each tool looks reasonable alone."
     )
     default_severity = "high"
+    severity_rationale = (
+        "High because attackers chain tools, and this is exactly the shape real exfiltration "
+        "takes: one tool reads the secret, the other moves it off the host. Each half looks "
+        "innocent, which is why the pair earns the severity."
+    )
 
     def _capabilities(self, tool: dict) -> set[str]:
         text = f"{tool.get('name', '')} {tool.get('description', '')}"

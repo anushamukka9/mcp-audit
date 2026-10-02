@@ -25,6 +25,11 @@ class NoRateLimitCheck(Check):
         "scraping, stuffing, and cost amplification."
     )
     default_severity = "low"
+    severity_rationale = (
+        "Low on purpose: this is hygiene, not a vulnerability. Missing rate limiting enables "
+        "abuse at scale, but it needs a real flaw underneath to become an incident. Worth the "
+        "flag, not the panic."
+    )
 
     def run(self, manifest: dict) -> list[Finding]:
         findings: list[Finding] = []

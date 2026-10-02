@@ -29,6 +29,11 @@ class VerboseErrorsCheck(Check):
         "suggest the server leaks internals on failure."
     )
     default_severity = "low"
+    severity_rationale = (
+        "Low because this is an information leak, not a control failure. Stack traces reveal "
+        "paths and versions, which help an attacker enumerate but do not hand them access. Fix it "
+        "the next time you are in the file."
+    )
 
     def run(self, manifest: dict) -> list[Finding]:
         findings: list[Finding] = []

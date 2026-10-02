@@ -33,6 +33,12 @@ class WeakInputSchemaCheck(Check):
         "schema-level validation invite traversal and injection."
     )
     default_severity = "medium"
+    severity_rationale = (
+        "Medium because the check reads the schema, not the server: a flagged parameter may be "
+        "perfectly safe behind server-side validation. But an unvalidated path or command "
+        "parameter is where traversal and injection start, so the flag buys a confirmation you "
+        "need anyway."
+    )
 
     def _properties(self, schema: dict) -> dict:
         if not isinstance(schema, dict):

@@ -30,6 +30,11 @@ class MissingAuthCheck(Check):
         "Missing auth annotations suggest missing (or undocumented) access control."
     )
     default_severity = "medium"
+    severity_rationale = (
+        "Medium because it is evidence of a gap, not proof of one. A missing annotation means "
+        "either missing access control or missing documentation, and the server owner needs to "
+        "say which."
+    )
 
     def run(self, manifest: dict) -> list[Finding]:
         findings: list[Finding] = []
