@@ -7,6 +7,15 @@ import json
 import sys
 
 from . import __version__, audit_server
+from .client_config import scan_client_config, scan_discovered_configs
+from .live import (
+    LiveAuditError,
+    LiveTarget,
+    live_audit,
+    parse_command,
+    parse_env,
+    parse_headers,
+)
 from .policy import AuditPolicy
 from .report import _FORMATS, format_report
 
@@ -55,6 +64,80 @@ def cmd_scan(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_live(args: argparse.Namespace) -> int:
+    try:
+        policy = _load_policy(args.config, args.fail_on)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"error: cannot read policy config: {exc}", file=sys.stderr)
+        return 2
+    try:
+        headers = parse_headers(args.header)
+        env = parse_env(args.env)
+        target = LiveTarget(
+            url=args.url,
+            command=parse_command(args.command) if args.command else [],
+            headers=headers,
+            env=env,
+            bind=args.bind,
+            timeout=args.timeout,
+        )
+        report = live_audit(target, policy=policy)
+    except LiveAuditError as exc:
+        print(f"error: live audit failed: {exc}", file=sys.stderr)
+        return 2
+
+    print(format_report(report, args.format))
+
+    if not policy.passes(report):
+        print(
+            f"\nFAILED: findings at or above '{policy.fail_on}' severity.",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
+def cmd_scan_config(args: argparse.Namespace) -> int:
+    try:
+        policy = _load_policy(args.config, args.fail_on)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"error: cannot read policy config: {exc}", file=sys.stderr)
+        return 2
+
+    if args.path:
+        try:
+            report = scan_client_config(args.path, policy=policy)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            print(f"error: cannot read {args.path}: {exc}", file=sys.stderr)
+            return 2
+        jobs = [("config", args.path, report)]
+    else:
+        try:
+            jobs = scan_discovered_configs(policy=policy)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            print(f"error: cannot read a discovered config: {exc}", file=sys.stderr)
+            return 2
+        if not jobs:
+            print("no MCP client configs found in the usual locations.")
+            print("Pass --path to scan a specific file.")
+            return 0
+
+    failed = False
+    for source, path, report in jobs:
+        print(f"--- {source}: {path} ---")
+        print(format_report(report, args.format))
+        print()
+        if not policy.passes(report):
+            failed = True
+    if failed:
+        print(
+            f"\nFAILED: findings at or above '{policy.fail_on}' severity.",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="mcp-audit",
@@ -83,6 +166,108 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to a JSON policy file (fail_on, disabled_checks, allowlist).",
     )
     scan.set_defaults(func=cmd_scan)
+
+    live = sub.add_parser(
+        "live",
+        help="Audit a running MCP server (HTTP/SSE or stdio).",
+        description=(
+            "Connect to a running MCP server, enumerate its tools, resources, "
+            "and prompts over the live protocol, and audit what it actually "
+            "exposes. The auth probe is real: an unauthenticated tools/list "
+            "is attempted first."
+        ),
+    )
+    target_group = live.add_mutually_exclusive_group(required=True)
+    target_group.add_argument(
+        "--url",
+        default=None,
+        help="HTTP(S) URL of the MCP endpoint (streamable HTTP or SSE).",
+    )
+    target_group.add_argument(
+        "--command",
+        default=None,
+        help="Shell-style command launching the server over stdio, e.g. 'python server.py'.",
+    )
+    live.add_argument(
+        "--header",
+        action="append",
+        default=[],
+        metavar="'Name: Value'",
+        help="HTTP header to send (repeatable). Used after the "
+        "unauthenticated probe when the server requires auth.",
+    )
+    live.add_argument(
+        "--env",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="Environment variable for a --command server (repeatable).",
+    )
+    live.add_argument(
+        "--bind",
+        default=None,
+        help="How the server binds (e.g. 0.0.0.0 or 127.0.0.1). Declared, "
+        "not measured: a probe cannot see a bind address from outside.",
+    )
+    live.add_argument(
+        "--timeout",
+        type=float,
+        default=10.0,
+        help="Seconds to wait for server responses (default: 10).",
+    )
+    live.add_argument(
+        "--format",
+        choices=list(_FORMATS),
+        default="table",
+        help="Output format (default: table).",
+    )
+    live.add_argument(
+        "--fail-on",
+        choices=["critical", "high", "medium", "low", "never"],
+        default=None,
+        help="Exit 1 if any finding meets this severity (default: high).",
+    )
+    live.add_argument(
+        "--config",
+        default=None,
+        help="Path to a JSON policy file (fail_on, disabled_checks, allowlist).",
+    )
+    live.set_defaults(func=cmd_live)
+
+    scfg = sub.add_parser(
+        "scan-config",
+        help="Scan MCP client configs (Claude Desktop, Cursor, Claude Code).",
+        description=(
+            "Read MCP client config files and flag risky server entries: "
+            "unpinned remote packages, plaintext secrets, unauthenticated "
+            "HTTP servers, plaintext HTTP off localhost, and piped "
+            "download-to-shell commands."
+        ),
+    )
+    scfg.add_argument(
+        "--path",
+        default=None,
+        help="Config file to scan. Defaults to auto-discovering the usual "
+        "Claude Desktop / Cursor / Claude Code locations.",
+    )
+    scfg.add_argument(
+        "--format",
+        choices=list(_FORMATS),
+        default="table",
+        help="Output format (default: table).",
+    )
+    scfg.add_argument(
+        "--fail-on",
+        choices=["critical", "high", "medium", "low", "never"],
+        default=None,
+        help="Exit 1 if any finding meets this severity (default: high).",
+    )
+    scfg.add_argument(
+        "--config",
+        default=None,
+        help="Path to a JSON policy file (fail_on, disabled_checks, allowlist).",
+    )
+    scfg.set_defaults(func=cmd_scan_config)
     return parser
 
 

@@ -1,0 +1,1 @@
+{"expected_checks":[],"manifest":{"server":{"name":"local","transport":{"auth_required":true,"bind":"127.0.0.1","port":18765,"probed":true,"type":"http","url":"http://127.0.0.1:18765/mcp"}},"tools":[{"annotations":{"rate_limit":"60/min","readOnlyHint":true},"description":"Return the server time.","inputSchema":{"properties":{}},"name":"server_time"}]},"name":"localhost-clean"}

@@ -28,7 +28,7 @@ from .core import (
 )
 from .policy import AuditPolicy
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 
 def audit_server(

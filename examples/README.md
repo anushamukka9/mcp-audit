@@ -23,7 +23,19 @@ python examples/audit_fixture_server.py --format markdown
 python examples/audit_fixture_server.py --format html > report.html
 ```
 
-The fixture trips all 18 checks (42 findings: 2 critical, 17 high,
+The fixture trips all 18 static checks (42 findings: 2 critical, 17 high,
 15 medium, 8 low), so this doubles as the nastiest test asset in the
 repo. Open the fixture source alongside the output to see each issue in
 the code that caused it.
+
+`live_audit_demo.py` is the live-mode counterpart: it starts a
+deliberately exposed MCP server in a thread (no auth, shell tool, bound
+localhost for safety with a declared 0.0.0.0 deployment) and runs the
+real probe against it, so you can watch `unauthenticated_exposure`,
+`exposed_bind`, and `network_tool_bridge` fire without deploying
+anything.
+
+```bash
+python examples/live_audit_demo.py
+python examples/live_audit_demo.py --format markdown
+```

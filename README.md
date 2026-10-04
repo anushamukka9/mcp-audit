@@ -3,8 +3,11 @@
 Security auditing for MCP servers. Point it at your server's tool,
 resource, and prompt manifest and it flags the issues it can see
 statically: injected instructions in descriptions, over-broad tools,
-dangerous tool pairs, exposed secrets, and more. Deterministic, no model
-calls, no network.
+dangerous tool pairs, exposed secrets, and more. Or point it at a
+*running* server with live mode and it enumerates the real tool surface
+over the protocol, including a genuine unauthenticated-access probe.
+Deterministic, no model calls. The static scan never touches the
+network; live mode is the explicit, opt-in exception.
 
 ## Why this exists
 
@@ -80,9 +83,56 @@ findings on purpose) and `examples/clean_manifest.json` (zero findings,
 and a decent template for how to write a manifest). For the full
 walkthrough, `examples/audit_fixture_server.py` extracts a manifest from
 the deliberately vulnerable server in `fixtures/vulnerable_server/` and
-audits it: all 18 checks fire, 42 findings, which makes the fixture the
+audits it: all 18 static checks fire, 42 findings, which makes the fixture the
 nastiest test asset in the repo. Open the fixture source next to the
 output to see each issue in the code that caused it.
+
+## Live-server audit
+
+Static manifests describe what a server *should* expose. Live mode asks
+the server itself:
+
+```bash
+$ mcp-audit live --url http://127.0.0.1:8080/mcp --bind 0.0.0.0
+
+mcp-audit: acme-ops-server - 9 finding(s)
+severity: critical=1, high=3, medium=3, low=2
+
+[CRITICAL] server:acme-ops-server
+           MCP transport is exposed without authentication (unauthenticated_exposure)
+[HIGH    ] server:acme-ops-server
+           Transport bound to 0.0.0.0 on port 8080 (exposed_bind)
+...
+```
+
+It connects over streamable HTTP or legacy SSE (or launches the server
+over stdio with `--command "python server.py"`), runs the MCP handshake,
+and enumerates tools, resources, and prompts. The auth probe is real: an
+unauthenticated `tools/list` goes out first, and if the server answers,
+that is the Ruflo failure mode (CVE-2026-59726) measured, not guessed.
+If the server answers 401/403, pass `--header "Authorization: Bearer
+$TOKEN"` to enumerate behind auth.
+
+`examples/live_audit_demo.py` runs the whole thing against a
+deliberately exposed local server so you can watch the live checks fire
+without deploying anything. See [docs/live-audit.md](docs/live-audit.md).
+
+## Scanning client configs
+
+Your MCP client config is attack surface too. `scan-config` reads your
+Claude Desktop, Cursor, or Claude Code config and flags the risky
+entries: unpinned `npx` packages, plaintext secrets, unauthenticated or
+plaintext-HTTP remote servers, and `curl | sh` install patterns:
+
+```bash
+$ mcp-audit scan-config
+
+--- cursor: /home/you/.cursor/mcp.json ---
+mcp-audit: client-config:mcp.json - 2 finding(s)
+...
+```
+
+See [docs/client-config.md](docs/client-config.md).
 
 ## Checks
 
@@ -106,6 +156,15 @@ output to see each issue in the code that caused it.
 | `exfiltration_path` | high | A sensitive resource on a server that also ships a network-capable tool: a complete exfiltration path with no reader tool needed |
 | `privilege_mixing` | medium | Some state-changing tools carry auth annotations while others do not |
 | `prompt_reads_sensitive` | high | Prompt templates referencing sensitive file paths or instructing the model to read secrets |
+| `unauthenticated_exposure` | critical/high | Network transport answered an unauthenticated probe (critical), or declares no auth (high). The Ruflo failure mode (CVE-2026-59726) |
+| `exposed_bind` | high | Transport bound to 0.0.0.0 / :: (declared via `--bind`) |
+| `dangerous_default_port` | low | Port is a commonly scanned default; a discovery heuristic, not a verdict |
+| `network_tool_bridge` | high | Network-reachable transport plus shell-execution or file-write tools |
+| `config_remote_package` | high | Client config runs `npx`/`uvx` with an unpinned remote package |
+| `config_plaintext_secret` | medium | Secret-looking env var names in a plaintext client config |
+| `config_unauthenticated_http` | high/medium | Client config points at an HTTP/SSE server with no auth header |
+| `config_insecure_transport` | high | Client config uses `http://` to a non-localhost server |
+| `config_shell_pipe` | high | Client config command shaped like `curl <url> | sh` |
 
 Every severity comes with a rationale: each check documents why its
 findings get their severity (`Check.severity_rationale`, surfaced as
@@ -134,28 +193,36 @@ clean, including near-miss cases). Run them yourself:
 python -m mcp_audit.benchmark
 ```
 
-Results on the bundled set (22 manifests, 34 check activations):
+Results on the bundled set (24 manifests, 42 check activations):
 
 | check | n | precision | recall | F1 |
 |---|---|---|---|---|
 | description_injection | 2 | 1.00 | 1.00 | 1.00 |
-| broad_tool | 4 | 1.00 | 1.00 | 1.00 |
-| missing_auth | 5 | 1.00 | 1.00 | 1.00 |
+| approval_bypass | 1 | 1.00 | 1.00 | 1.00 |
+| broad_tool | 5 | 1.00 | 1.00 | 1.00 |
+| missing_auth | 6 | 1.00 | 1.00 | 1.00 |
 | dangerous_combo | 1 | 1.00 | 1.00 | 1.00 |
 | sensitive_resource | 3 | 1.00 | 1.00 | 1.00 |
 | prompt_template_injection | 2 | 1.00 | 1.00 | 1.00 |
 | tool_impersonation | 1 | 1.00 | 1.00 | 1.00 |
-| weak_input_schema | 4 | 1.00 | 1.00 | 1.00 |
+| weak_input_schema | 5 | 1.00 | 1.00 | 1.00 |
 | verbose_errors | 1 | 1.00 | 1.00 | 1.00 |
-| no_rate_limit | 3 | 1.00 | 1.00 | 1.00 |
+| no_rate_limit | 4 | 1.00 | 1.00 | 1.00 |
 | path_traversal | 1 | 1.00 | 1.00 | 1.00 |
 | embedded_secret | 1 | 1.00 | 1.00 | 1.00 |
-| approval_bypass | 1 | 1.00 | 1.00 | 1.00 |
 | credential_request | 1 | 1.00 | 1.00 | 1.00 |
 | elevated_privilege | 1 | 1.00 | 1.00 | 1.00 |
 | exfiltration_path | 1 | 1.00 | 1.00 | 1.00 |
 | privilege_mixing | 1 | 1.00 | 1.00 | 1.00 |
 | prompt_reads_sensitive | 1 | 1.00 | 1.00 | 1.00 |
+| unauthenticated_exposure | 1 | 1.00 | 1.00 | 1.00 |
+| exposed_bind | 1 | 1.00 | 1.00 | 1.00 |
+| dangerous_default_port | 1 | 1.00 | 1.00 | 1.00 |
+| network_tool_bridge | 1 | 1.00 | 1.00 | 1.00 |
+
+The `config_*` checks are not in the benchmark table: they read client
+config files, not server manifests, so they never activate on the
+labeled set. They are covered by unit tests instead.
 
 Take these numbers for what they are: a smoke test proving the patterns
 fire on the obvious cases, not a security certification. The set is small
@@ -241,9 +308,12 @@ Fail the build or upload SARIF to code scanning. See
 
 ## Honest limitations
 
-- These checks read the manifest, not the server. They cannot verify that
+- The static checks read the manifest, not the server. They cannot verify that
   auth is enforced, that a resource is really served, or that validation
-  exists beyond the schema.
+  exists beyond the schema. Live mode (`mcp-audit live`) closes the first
+  gap by enumerating a running server and measuring whether its transport
+  answers without auth, but it never calls a tool, so `tools/call`-level
+  auth stays untested, and the bind address is declared, not measured.
 - Description-injection detection is phrase matching. Paraphrased,
   non-English, or obfuscated injections will get through, and legitimate
   imperative descriptions will get flagged.
@@ -274,8 +344,9 @@ Fail the build or upload SARIF to code scanning. See
 
 ## Roadmap
 
-- Manifest builder that extracts tools/resources/prompts from a live MCP
-  server over stdio, so you can audit without hand-writing JSON
+- [x] 0.5.0: live-server audit mode (enumerate a running server over
+  HTTP/SSE/stdio, with a real unauthenticated-access probe) and the
+  client-config scanner
 - More pair checks (prompt that reads a sensitive resource is done;
   remaining: auth tool + anonymous tool on the same server)
 - Larger, community-sourced benchmark manifests

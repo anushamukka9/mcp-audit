@@ -26,7 +26,21 @@ def test_fixture_triggers_every_check():
     report = audit_server(audit_fixture_server.build_manifest())
     fired = {f.check_id for f in report.findings}
     expected = {c.id for c in default_checks()}
-    assert fired == expected
+    # Live-transport and client-config checks are inert on a static manifest:
+    # they need a measured "transport" block or a "client_servers" list, and
+    # the fixture is deliberately a plain static manifest.
+    inert_on_static = {
+        "unauthenticated_exposure",
+        "exposed_bind",
+        "dangerous_default_port",
+        "network_tool_bridge",
+        "config_remote_package",
+        "config_plaintext_secret",
+        "config_unauthenticated_http",
+        "config_insecure_transport",
+        "config_shell_pipe",
+    }
+    assert fired == expected - inert_on_static
 
 
 def test_fixture_has_critical_findings():
