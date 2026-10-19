@@ -1,4 +1,4 @@
-"""The twenty-seven checks, and the default set used by audit_server()."""
+"""The twenty-eight checks, and the default set used by audit_server()."""
 
 from .approval_bypass import ApprovalBypassCheck
 from .base import Check
@@ -16,6 +16,7 @@ from .elevated_privilege import ElevatedPrivilegeCheck
 from .embedded_secret import EmbeddedSecretCheck
 from .exfiltration_path import ExfiltrationPathCheck
 from .exposed_bind import ExposedBindCheck
+from .known_vulnerable_package import KnownVulnerablePackageCheck
 from .missing_auth import MissingAuthCheck
 from .network_tool_bridge import NetworkToolBridgeCheck
 from .no_rate_limit import NoRateLimitCheck
@@ -51,6 +52,10 @@ def default_checks() -> list[Check]:
         ExfiltrationPathCheck(),
         PrivilegeMixingCheck(),
         PromptReadsSensitiveCheck(),
+        # Threat-intel check: matches names against the bundled CVE feed
+        # snapshot (offline; see mcp_audit.cve_feed). Inert when no named
+        # package matches an entry.
+        KnownVulnerablePackageCheck(),
         # Live-transport checks: inert unless the manifest's server block
         # carries a "transport" section (filled in by mcp-audit live).
         UnauthenticatedExposureCheck(),
@@ -84,6 +89,7 @@ __all__ = [
     "ConfigShellPipeCheck",
     "ConfigUnauthenticatedHttpCheck",
     "CredentialRequestCheck",
+    "KnownVulnerablePackageCheck",
     "DangerousComboCheck",
     "DangerousDefaultPortCheck",
     "DescriptionInjectionCheck",

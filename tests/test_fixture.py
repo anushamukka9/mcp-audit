@@ -28,8 +28,10 @@ def test_fixture_triggers_every_check():
     expected = {c.id for c in default_checks()}
     # Live-transport and client-config checks are inert on a static manifest:
     # they need a measured "transport" block or a "client_servers" list, and
-    # the fixture is deliberately a plain static manifest.
+    # the fixture is deliberately a plain static manifest. The CVE feed check
+    # is inert too: the fixture server's name matches no feed entry.
     inert_on_static = {
+        "known_vulnerable_package",
         "unauthenticated_exposure",
         "exposed_bind",
         "dangerous_default_port",

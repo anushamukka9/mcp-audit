@@ -1,0 +1,10 @@
+{
+    "name": "known-vulnerable-near-miss",
+    "manifest": {
+        "server": {"name": "ruflo-fork", "version": "1.0.0"},
+        "tools": [],
+        "resources": [],
+        "prompts": []
+    },
+    "expected_checks": []
+}

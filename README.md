@@ -134,6 +134,30 @@ mcp-audit: client-config:mcp.json - 2 finding(s)
 
 See [docs/client-config.md](docs/client-config.md).
 
+## Known-vulnerable packages (CVE feed)
+
+Shape checks catch risky patterns. The feed check catches *named*
+trouble: it compares the packages your manifest declares (the server
+block, a `dependencies` list, client-config runner specs) against a
+feed of disclosed vulnerabilities and reports matches with their CVE
+ids:
+
+```bash
+$ mcp-audit scan manifest.json
+
+[CRITICAL] server:ruflo
+           CVE-2026-59726: package 'ruflo' 1.0.0 is in the affected range (*)
+```
+
+The scan stays offline. A small bundled snapshot (dated 2026-10-17,
+two entries I could tie to a specific disclosure: the Ruflo bridge RCE
+and the Bifrost gateway RCE) ships in the package, and you can swap in
+a feed you maintain with `--cve-feed my-feed.json` on `scan`, `live`,
+and `scan-config`. Confirmed version matches carry the advisory's
+severity; a name match with no declared version lands at medium and
+says it is unconfirmed. See [docs/cve-feed.md](docs/cve-feed.md) for
+the feed format and the honest limits of a two-entry snapshot.
+
 ## Checks
 
 | Check | Severity | What it catches |
@@ -193,7 +217,7 @@ clean, including near-miss cases). Run them yourself:
 python -m mcp_audit.benchmark
 ```
 
-Results on the bundled set (24 manifests, 42 check activations):
+Results on the bundled set (26 manifests, 43 check activations):
 
 | check | n | precision | recall | F1 |
 |---|---|---|---|---|
@@ -215,6 +239,7 @@ Results on the bundled set (24 manifests, 42 check activations):
 | exfiltration_path | 1 | 1.00 | 1.00 | 1.00 |
 | privilege_mixing | 1 | 1.00 | 1.00 | 1.00 |
 | prompt_reads_sensitive | 1 | 1.00 | 1.00 | 1.00 |
+| known_vulnerable_package | 1 | 1.00 | 1.00 | 1.00 |
 | unauthenticated_exposure | 1 | 1.00 | 1.00 | 1.00 |
 | exposed_bind | 1 | 1.00 | 1.00 | 1.00 |
 | dangerous_default_port | 1 | 1.00 | 1.00 | 1.00 |
@@ -222,7 +247,10 @@ Results on the bundled set (24 manifests, 42 check activations):
 
 The `config_*` checks are not in the benchmark table: they read client
 config files, not server manifests, so they never activate on the
-labeled set. They are covered by unit tests instead.
+labeled set. They are covered by unit tests instead. The feed check's
+benchmark row is one confirmed match plus a fork near-miss that must
+stay silent; its range engine is covered by unit tests with a test
+feed, because the bundled snapshot's ranges are deliberately broad.
 
 Take these numbers for what they are: a smoke test proving the patterns
 fire on the obvious cases, not a security certification. The set is small
@@ -341,12 +369,19 @@ Fail the build or upload SARIF to code scanning. See
 - Low-severity checks (`no_rate_limit`, `verbose_errors`) are hygiene
   notes. They are noisy on purpose; tune them with a policy file rather
   than ignoring the whole report.
+- The CVE feed snapshot is small (two entries) and goes stale by
+  design: the scan never fetches anything, so the feed is only as
+  current as the snapshot date printed in each finding, or the file
+  you pass with `--cve-feed`. No match means no match in that feed,
+  not a clean bill of health.
 
 ## Roadmap
 
 - [x] 0.5.0: live-server audit mode (enumerate a running server over
   HTTP/SSE/stdio, with a real unauthenticated-access probe) and the
   client-config scanner
+- [x] 0.6.0: CVE feed check (known-vulnerable package matching against
+  a bundled offline snapshot, swappable with `--cve-feed`)
 - More pair checks (prompt that reads a sensitive resource is done;
   remaining: auth tool + anonymous tool on the same server)
 - Larger, community-sourced benchmark manifests

@@ -48,6 +48,12 @@ checks read the `client_servers` list built by
 ordinary server manifests. See [live-audit.md](live-audit.md) and
 [client-config.md](client-config.md).
 
+The `known_vulnerable_package` check is the one check that does not
+reason about manifest shape: it compares declared package names
+(server block, `dependencies`, client-config runner specs) against a
+CVE feed. The bundled feed is an offline snapshot; `--cve-feed` swaps
+in your own. See [cve-feed.md](cve-feed.md).
+
 Per-check severity can be tuned without forking the checks: see
 `severity_overrides` in [configuration.md](configuration.md).
 

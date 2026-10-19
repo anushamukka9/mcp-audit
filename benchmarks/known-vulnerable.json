@@ -1,0 +1,10 @@
+{
+    "name": "known-vulnerable",
+    "manifest": {
+        "server": {"name": "ruflo", "version": "1.0.0"},
+        "tools": [],
+        "resources": [],
+        "prompts": []
+    },
+    "expected_checks": ["known_vulnerable_package"]
+}

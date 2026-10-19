@@ -7,7 +7,10 @@ import json
 import sys
 
 from . import __version__, audit_server
+from .checks import default_checks
+from .checks.known_vulnerable_package import KnownVulnerablePackageCheck
 from .client_config import scan_client_config, scan_discovered_configs
+from .cve_feed import load_feed
 from .live import (
     LiveAuditError,
     LiveTarget,
@@ -26,6 +29,20 @@ def _load_manifest(path: str) -> dict:
     if not isinstance(data, dict):
         raise ValueError("manifest must be a JSON object")
     return data
+
+
+def _load_checks(cve_feed_path: str | None) -> list | None:
+    """Default checks, or defaults with the CVE check fed from a file.
+
+    Returns None when no --cve-feed was passed, which audit_server reads
+    as "use the defaults" (bundled feed snapshot included).
+    """
+    if not cve_feed_path:
+        return None
+    feed = load_feed(cve_feed_path)
+    checks = [c for c in default_checks() if c.id != "known_vulnerable_package"]
+    checks.append(KnownVulnerablePackageCheck(feed))
+    return checks
 
 
 def _load_policy(path: str | None, fail_on: str | None) -> AuditPolicy:
@@ -50,8 +67,13 @@ def cmd_scan(args: argparse.Namespace) -> int:
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: cannot read policy config: {exc}", file=sys.stderr)
         return 2
+    try:
+        checks = _load_checks(args.cve_feed)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"error: cannot read CVE feed: {exc}", file=sys.stderr)
+        return 2
 
-    report = audit_server(manifest, policy=policy)
+    report = audit_server(manifest, checks=checks, policy=policy)
 
     print(format_report(report, args.format))
 
@@ -71,6 +93,11 @@ def cmd_live(args: argparse.Namespace) -> int:
         print(f"error: cannot read policy config: {exc}", file=sys.stderr)
         return 2
     try:
+        checks = _load_checks(args.cve_feed)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"error: cannot read CVE feed: {exc}", file=sys.stderr)
+        return 2
+    try:
         headers = parse_headers(args.header)
         env = parse_env(args.env)
         target = LiveTarget(
@@ -81,7 +108,7 @@ def cmd_live(args: argparse.Namespace) -> int:
             bind=args.bind,
             timeout=args.timeout,
         )
-        report = live_audit(target, policy=policy)
+        report = live_audit(target, checks=checks, policy=policy)
     except LiveAuditError as exc:
         print(f"error: live audit failed: {exc}", file=sys.stderr)
         return 2
@@ -104,16 +131,22 @@ def cmd_scan_config(args: argparse.Namespace) -> int:
         print(f"error: cannot read policy config: {exc}", file=sys.stderr)
         return 2
 
+    try:
+        config_checks = _load_checks(args.cve_feed)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"error: cannot read CVE feed: {exc}", file=sys.stderr)
+        return 2
+
     if args.path:
         try:
-            report = scan_client_config(args.path, policy=policy)
+            report = scan_client_config(args.path, checks=config_checks, policy=policy)
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             print(f"error: cannot read {args.path}: {exc}", file=sys.stderr)
             return 2
         jobs = [("config", args.path, report)]
     else:
         try:
-            jobs = scan_discovered_configs(policy=policy)
+            jobs = scan_discovered_configs(checks=config_checks, policy=policy)
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             print(f"error: cannot read a discovered config: {exc}", file=sys.stderr)
             return 2
@@ -164,6 +197,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--config",
         default=None,
         help="Path to a JSON policy file (fail_on, disabled_checks, allowlist).",
+    )
+    scan.add_argument(
+        "--cve-feed",
+        default=None,
+        help="Path to a CVE feed JSON file for the known_vulnerable_package "
+        "check. Defaults to the bundled snapshot; the scan stays offline "
+        "either way.",
     )
     scan.set_defaults(func=cmd_scan)
 
@@ -232,6 +272,13 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Path to a JSON policy file (fail_on, disabled_checks, allowlist).",
     )
+    live.add_argument(
+        "--cve-feed",
+        default=None,
+        help="Path to a CVE feed JSON file for the known_vulnerable_package "
+        "check. Defaults to the bundled snapshot; the scan stays offline "
+        "either way.",
+    )
     live.set_defaults(func=cmd_live)
 
     scfg = sub.add_parser(
@@ -266,6 +313,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--config",
         default=None,
         help="Path to a JSON policy file (fail_on, disabled_checks, allowlist).",
+    )
+    scfg.add_argument(
+        "--cve-feed",
+        default=None,
+        help="Path to a CVE feed JSON file for the known_vulnerable_package "
+        "check. Defaults to the bundled snapshot; the scan stays offline "
+        "either way.",
     )
     scfg.set_defaults(func=cmd_scan_config)
     return parser

@@ -26,9 +26,10 @@ from .core import (
     AuditReport,
     Finding,
 )
+from .cve_feed import CveEntry, CveFeed, load_feed
 from .policy import AuditPolicy
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 
 def audit_server(
@@ -58,6 +59,8 @@ def audit_server(
 
 __all__ = [
     "AuditPolicy",
+    "CveEntry",
+    "CveFeed",
     "AuditReport",
     "CRITICAL",
     "Check",
@@ -67,6 +70,7 @@ __all__ = [
     "MEDIUM",
     "SEVERITIES",
     "audit_server",
+    "load_feed",
     "check_by_id",
     "default_checks",
 ]
