@@ -158,6 +158,29 @@ severity; a name match with no declared version lands at medium and
 says it is unconfirmed. See [docs/cve-feed.md](docs/cve-feed.md) for
 the feed format and the honest limits of a two-entry snapshot.
 
+## Playground (web demo backend)
+
+The demo site is coming together in two slices. This slice is the
+backend: a small FastAPI service in `playground/` that wraps the
+library, so a manifest pasted in a browser gets the same audit the
+CLI gives you.
+
+```bash
+pip install -e . && pip install -r playground/requirements.txt
+python -m playground.app   # http://127.0.0.1:8000
+curl -X POST localhost:8000/audit --data @examples/vulnerable_manifest.json
+```
+
+`POST /audit` returns the full report (summary counts, findings
+with severity rationale and remediation) plus `finding_count` and
+`highest_severity`. Input is guarded before it is audited: 400 for
+non-JSON or non-object bodies, 413 past a 256 KB cap, 422 when a
+manifest declares nothing to audit. The service is stateless:
+manifests are audited in memory and forgotten, never stored. The
+frontend (one static page) is the next slice. See
+[docs/playground.md](docs/playground.md) and
+[playground/README.md](playground/README.md).
+
 ## Checks
 
 | Check | Severity | What it catches |
