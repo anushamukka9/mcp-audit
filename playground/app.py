@@ -1,9 +1,10 @@
 """Playground backend: mcp-audit as a small web service.
 
-This is the API half of the public playground. Paste an MCP server
-manifest, get the full audit report back as JSON. The frontend (one
-static page) lands separately; today the service stands on its own
-and every endpoint below is exercised by the tests in tests/.
+This is the service half of the public playground. Paste an MCP
+server manifest, get the full audit report back as JSON. The
+frontend is one static page (playground/static/index.html, no build
+step, no framework) served at /ui by this same app, so a single
+command runs the whole demo end to end.
 
 Design rules I held to:
 
@@ -32,12 +33,17 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from mcp_audit import __version__ as MCP_AUDIT_VERSION
 from mcp_audit import audit_server, default_checks
+
+#: The single-page frontend. One static HTML file, inline CSS and
+#: JS, no build step and no external assets.
+STATIC_INDEX = Path(__file__).parent / "static" / "index.html"
 
 #: Default cap on a submitted manifest, in bytes. Real manifests run
 #: a few KB; 256 KB is generous headroom, not an invitation.
@@ -106,6 +112,7 @@ def create_app(max_manifest_bytes: int = DEFAULT_MAX_MANIFEST_BYTES) -> FastAPI:
                 "health": "GET /healthz",
                 "example": "GET /example",
                 "audit": "POST /audit with a manifest JSON body",
+                "ui": "GET /ui (the single-page frontend)",
             },
             "docs": "https://github.com/anushamukka9/mcp-audit/blob/develop/docs/playground.md",
         }
@@ -113,6 +120,10 @@ def create_app(max_manifest_bytes: int = DEFAULT_MAX_MANIFEST_BYTES) -> FastAPI:
     @app.get("/healthz")
     def healthz() -> dict:
         return {"status": "ok"}
+
+    @app.get("/ui", response_class=HTMLResponse)
+    def ui() -> HTMLResponse:
+        return HTMLResponse(content=STATIC_INDEX.read_text(encoding="utf-8"))
 
     @app.get("/example")
     def example() -> dict:
