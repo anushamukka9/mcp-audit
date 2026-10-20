@@ -158,26 +158,29 @@ severity; a name match with no declared version lands at medium and
 says it is unconfirmed. See [docs/cve-feed.md](docs/cve-feed.md) for
 the feed format and the honest limits of a two-entry snapshot.
 
-## Playground (web demo backend)
+## Playground (web demo)
 
-The demo site is coming together in two slices. This slice is the
-backend: a small FastAPI service in `playground/` that wraps the
-library, so a manifest pasted in a browser gets the same audit the
-CLI gives you.
+The public demo site lives in `playground/` and runs with one
+command: a small FastAPI service wrapping the library, serving one
+static page at `http://127.0.0.1:8000/ui`.
 
 ```bash
 pip install -e . && pip install -r playground/requirements.txt
-python -m playground.app   # http://127.0.0.1:8000
-curl -X POST localhost:8000/audit --data @examples/vulnerable_manifest.json
+python -m playground.app   # then open http://127.0.0.1:8000/ui
 ```
 
-`POST /audit` returns the full report (summary counts, findings
-with severity rationale and remediation) plus `finding_count` and
-`highest_severity`. Input is guarded before it is audited: 400 for
-non-JSON or non-object bodies, 413 past a 256 KB cap, 422 when a
-manifest declares nothing to audit. The service is stateless:
-manifests are audited in memory and forgotten, never stored. The
-frontend (one static page) is the next slice. See
+Paste a manifest, get the full audit in the browser:
+severity-colored findings, the explanation and the rationale for
+every one, and the plain-English fix. The same vulnerable example
+(11 findings, 2 critical) and a clean one are one click away, and
+the share link carries the manifest in the URL fragment, so a link
+opened anywhere preloads that exact manifest and runs the audit.
+No build step, no framework, no external assets; the page renders
+every finding as text so a hostile manifest cannot write the page.
+Input is guarded before it is audited: 400 for non-JSON or
+non-object bodies, 413 past a 256 KB cap, 422 when a manifest
+declares nothing to audit. The service is stateless: manifests are
+audited in memory and forgotten, never stored. See
 [docs/playground.md](docs/playground.md) and
 [playground/README.md](playground/README.md).
 

@@ -133,3 +133,37 @@ def test_oversized_manifest_is_a_413() -> None:
     resp = small.post("/audit", content=json.dumps(EXAMPLE_MANIFEST))
     assert resp.status_code == 413
     assert resp.json()["error"]["code"] == "manifest_too_large"
+
+
+def test_index_lists_the_ui(client: TestClient) -> None:
+    body = client.get("/").json()
+    assert "ui" in body["endpoints"]
+
+
+def test_ui_serves_the_single_page_frontend(client: TestClient) -> None:
+    resp = client.get("/ui")
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers["content-type"]
+    page = resp.text
+    # The paste box, the audit action, and the share-link machinery.
+    assert 'id="manifest"' in page
+    assert 'id="audit"' in page
+    assert 'id="share"' in page
+    assert "encodeManifest" in page
+    assert "#m=" in page
+    # Severity coloring for every level the API can return.
+    for severity in ("critical", "high", "medium", "low"):
+        assert f".pill.{severity}" in page
+        assert f".badge.{severity}" in page
+    # Findings are rendered with textContent, never as raw HTML.
+    assert "textContent" in page
+
+
+def test_ui_page_is_self_contained(client: TestClient) -> None:
+    page = client.get("/ui").text
+    # No build step and no framework means no external assets at all:
+    # no script or stylesheet is loaded from anywhere else.
+    assert "<script src=" not in page
+    assert "<link" not in page
+    assert 'src="http' not in page
+    assert 'href="http' not in page.replace('href="https://github.com/anushamukka9/mcp-audit"', "")

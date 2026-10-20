@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mcp-audit playground - paste a manifest, get a security audit</title>
+<meta name="description" content="Paste an MCP server manifest and get the full mcp-audit report in your browser: severity-colored findings with plain-English remediation.">
+<style>
+  :root {
+    --critical: #b91c1c;
+    --high: #c2410c;
+    --medium: #a16207;
+    --low: #166534;
+    --ink: #1f2937;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --panel: #f9fafb;
+    --accent: #1d4ed8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: var(--ink);
+    margin: 0;
+    background: #ffffff;
+  }
+  main { max-width: 1060px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+  header h1 { font-size: 1.7rem; margin: 0 0 0.4rem; }
+  header p { color: var(--muted); margin: 0.2rem 0; max-width: 46rem; }
+  header p strong { color: var(--ink); }
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    margin-top: 1.25rem;
+    align-items: start;
+  }
+  @media (max-width: 820px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+  label { font-weight: 600; display: block; margin-bottom: 0.4rem; }
+  textarea {
+    width: 100%;
+    min-height: 26rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.82rem;
+    line-height: 1.45;
+    padding: 0.75rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    resize: vertical;
+  }
+  .buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
+  button {
+    font: inherit;
+    font-size: 0.9rem;
+    padding: 0.5rem 0.9rem;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: #ffffff;
+    cursor: pointer;
+  }
+  button:hover { border-color: #9ca3af; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #ffffff; font-weight: 600; }
+  button.primary:hover { background: #1e40af; }
+  button:disabled { opacity: 0.55; cursor: wait; }
+  .hint { color: var(--muted); font-size: 0.85rem; margin-top: 0.6rem; }
+  #status { min-height: 1.4rem; font-size: 0.9rem; margin-bottom: 0.6rem; }
+  #status.error { color: var(--critical); font-weight: 600; }
+  .summary { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.75rem; }
+  .pill {
+    display: inline-block; padding: 0.2rem 0.7rem; border-radius: 999px;
+    color: #ffffff; font-size: 0.85rem; font-weight: 600;
+  }
+  .pill.critical { background: var(--critical); }
+  .pill.high { background: var(--high); }
+  .pill.medium { background: var(--medium); }
+  .pill.low { background: var(--low); }
+  .pill.neutral { background: #4b5563; }
+  .card {
+    display: flex; gap: 0.9rem;
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 0.9rem; margin: 0.75rem 0;
+    border-left: 6px solid var(--line);
+  }
+  .card.critical { border-left-color: var(--critical); }
+  .card.high { border-left-color: var(--high); }
+  .card.medium { border-left-color: var(--medium); }
+  .card.low { border-left-color: var(--low); }
+  .badge {
+    color: #ffffff; font-weight: 700; font-size: 0.72rem;
+    height: fit-content; padding: 0.25rem 0.5rem; border-radius: 4px;
+    white-space: nowrap; text-transform: uppercase;
+  }
+  .badge.critical { background: var(--critical); }
+  .badge.high { background: var(--high); }
+  .badge.medium { background: var(--medium); }
+  .badge.low { background: var(--low); }
+  .card h2 { margin: 0 0 0.3rem; font-size: 1rem; }
+  .card p { margin: 0.35rem 0; font-size: 0.92rem; }
+  .meta { color: var(--muted); font-size: 0.83rem; }
+  .rationale {
+    background: var(--panel); border-left: 3px solid #d1d5db;
+    padding: 0.5rem 0.8rem; font-size: 0.88rem;
+  }
+  code { background: #f3f4f6; padding: 0.1rem 0.3rem; border-radius: 4px; font-size: 0.85em; }
+  .clean {
+    border: 1px solid var(--line); border-left: 6px solid var(--low);
+    border-radius: 8px; padding: 1rem; font-weight: 600; color: var(--low);
+  }
+  .empty { color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; padding: 1rem; }
+  footer { color: var(--muted); font-size: 0.85rem; margin-top: 2rem; max-width: 46rem; }
+  footer a, header a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>mcp-audit playground</h1>
+    <p><strong>Paste an MCP server manifest, get a security audit.</strong>
+    The same 28 checks the CLI runs, in your browser: injected instructions
+    in tool descriptions, over-broad tools, exposed secrets, dangerous
+    tool pairs, and the rest, each with a plain-English fix.</p>
+    <p>Your manifest is audited in memory by the playground backend and
+    forgotten. Nothing is stored. The share link below carries the
+    manifest in the URL itself, not on a server.</p>
+  </header>
+
+  <div class="layout">
+    <section aria-label="Manifest input">
+      <label for="manifest">MCP server manifest (JSON)</label>
+      <textarea id="manifest" spellcheck="false" placeholder="Paste your manifest JSON here, or load an example below."></textarea>
+      <div class="buttons">
+        <button id="audit" class="primary" type="button">Audit manifest</button>
+        <button id="load-example" type="button">Load vulnerable example</button>
+        <button id="load-clean" type="button">Load clean example</button>
+        <button id="format" type="button">Format JSON</button>
+        <button id="share" type="button">Copy share link</button>
+        <button id="clear" type="button">Clear</button>
+      </div>
+      <p class="hint">Tip: the vulnerable example comes back with 11 findings,
+      2 of them critical. The clean example comes back with none. That gap
+      is the whole demo.</p>
+    </section>
+
+    <section aria-label="Audit results">
+      <label id="results-label">Audit results</label>
+      <div id="status" role="status" aria-live="polite"></div>
+      <div id="summary" class="summary"></div>
+      <div id="results">
+        <p class="empty">No audit yet. Paste a manifest and hit
+        <strong>Audit manifest</strong>, or start with the vulnerable example.</p>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    <p>Built on <a href="https://github.com/anushamukka9/mcp-audit">mcp-audit</a>,
+    a deterministic manifest scanner with no model calls. A finding is a
+    pointer, not a verdict: read the remediation, check the actual server,
+    then decide. Running the backend yourself takes two commands, see
+    <code>playground/README.md</code> in the repo.</p>
+  </footer>
+</main>
+
+<script>
+"use strict";
+
+// The page is served by the playground backend at /ui, so the API
+// lives on the same origin. Opened as a bare file, fall back to the
+// default local backend address. An ?api= query parameter wins over
+// both, for pointing the page at a deployed backend.
+function apiBase() {
+  var params = new URLSearchParams(window.location.search);
+  var override = params.get("api");
+  if (override) return override.replace(/\/$/, "");
+  if (window.location.protocol === "file:") return "http://127.0.0.1:8000";
+  return "";
+}
+
+var CLEAN_MANIFEST = {
+  server: { name: "clean-server", version: "1.0.0" },
+  tools: [
+    {
+      name: "read_doc",
+      description: "Read one document from the docs folder by id.",
+      inputSchema: {
+        type: "object",
+        properties: { doc_id: { type: "string", maxLength: 64 } },
+        required: ["doc_id"]
+      },
+      annotations: { readOnlyHint: true, rate_limit: "60/min" }
+    }
+  ],
+  resources: [{ name: "guide", uri: "docs:///guide.md" }],
+  prompts: []
+};
+
+var manifestEl = document.getElementById("manifest");
+var statusEl = document.getElementById("status");
+var summaryEl = document.getElementById("summary");
+var resultsEl = document.getElementById("results");
+var auditBtn = document.getElementById("audit");
+
+function setStatus(text, isError) {
+  statusEl.textContent = text || "";
+  statusEl.className = isError ? "error" : "";
+}
+
+function el(tag, className, text) {
+  var node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+// Finding fields come from a manifest someone pasted, so every value
+// is rendered with textContent, never as HTML. A breached manifest
+// does not get to write this page.
+function renderReport(report) {
+  summaryEl.textContent = "";
+  resultsEl.textContent = "";
+
+  var severities = ["critical", "high", "medium", "low"];
+  severities.forEach(function (sev) {
+    var count = (report.summary && report.summary[sev]) || 0;
+    var pill = el("span", "pill " + sev, sev + ": " + count);
+    summaryEl.appendChild(pill);
+  });
+  var checks = el("span", "pill neutral", report.checks_run + " checks run");
+  summaryEl.appendChild(checks);
+
+  if (!report.findings || report.findings.length === 0) {
+    resultsEl.appendChild(el("p", "clean", "No findings. Nice manifest."));
+    setStatus("Audit complete: 0 findings.", false);
+    return;
+  }
+
+  setStatus(
+    "Audit complete: " + report.finding_count + " finding(s), highest severity " +
+      (report.highest_severity || "none") + ".",
+    false
+  );
+
+  report.findings.forEach(function (finding) {
+    var card = el("div", "card " + finding.severity);
+    var badge = el("div", "badge " + finding.severity, finding.severity);
+    var body = el("div", "");
+    body.appendChild(el("h2", "", finding.title));
+
+    var meta = el("p", "meta");
+    meta.appendChild(document.createTextNode("Target "));
+    var target = el("code", "", finding.target);
+    meta.appendChild(target);
+    meta.appendChild(document.createTextNode(" - check "));
+    var check = el("code", "", finding.check_id);
+    meta.appendChild(check);
+    body.appendChild(meta);
+
+    body.appendChild(el("p", "", finding.explanation));
+    if (finding.severity_rationale) {
+      var why = el("p", "rationale");
+      var strong = el("strong", "", "Why " + finding.severity + ": ");
+      why.appendChild(strong);
+      why.appendChild(document.createTextNode(finding.severity_rationale));
+      body.appendChild(why);
+    }
+    var fix = el("p", "");
+    fix.appendChild(el("strong", "", "Fix: "));
+    fix.appendChild(document.createTextNode(finding.remediation));
+    body.appendChild(fix);
+
+    card.appendChild(badge);
+    card.appendChild(body);
+    resultsEl.appendChild(card);
+  });
+}
+
+function showError(message) {
+  summaryEl.textContent = "";
+  resultsEl.textContent = "";
+  resultsEl.appendChild(el("p", "empty", message));
+  setStatus(message, true);
+}
+
+async function runAudit() {
+  var raw = manifestEl.value.trim();
+  if (!raw) {
+    showError("Nothing to audit yet. Paste a manifest or load an example first.");
+    return;
+  }
+  var parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    showError("That is not valid JSON yet: " + err.message);
+    return;
+  }
+  auditBtn.disabled = true;
+  setStatus("Auditing...", false);
+  try {
+    var resp = await fetch(apiBase() + "/audit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(parsed)
+    });
+    var data = await resp.json();
+    if (!resp.ok) {
+      var message = (data.error && data.error.message) || ("Audit failed with status " + resp.status + ".");
+      showError(message);
+      return;
+    }
+    renderReport(data);
+    updateShareHash(raw);
+  } catch (err) {
+    showError(
+      "Could not reach the audit backend at " + (apiBase() || window.location.origin) +
+        ". Start it with: python -m playground.app (from the repo root, after installing playground/requirements.txt)."
+    );
+  } finally {
+    auditBtn.disabled = false;
+  }
+}
+
+// Share links: the manifest travels in the URL fragment as base64url
+// of its UTF-8 bytes. Fragments never reach a server, so sharing a
+// link shares the manifest with the person you send it to, and with
+// nobody else.
+function encodeManifest(text) {
+  var bytes = new TextEncoder().encode(text);
+  var binary = "";
+  bytes.forEach(function (b) { binary += String.fromCharCode(b); });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function decodeManifest(encoded) {
+  var base64 = encoded.replace(/-/g, "+").replace(/_/g, "/");
+  while (base64.length % 4) base64 += "=";
+  var binary = atob(base64);
+  var bytes = new Uint8Array(binary.length);
+  for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
+function updateShareHash(raw) {
+  try {
+    history.replaceState(null, "", "#m=" + encodeManifest(raw));
+  } catch (err) {
+    // Very large manifests can exceed URL limits in some browsers.
+    // The audit still stands; only the share link is skipped.
+  }
+}
+
+function shareLink() {
+  var raw = manifestEl.value.trim();
+  if (!raw) {
+    setStatus("Nothing to share yet. Paste a manifest first.", true);
+    return window.location.href;
+  }
+  return window.location.href.split("#")[0] + "#m=" + encodeManifest(raw);
+}
+
+document.getElementById("audit").addEventListener("click", runAudit);
+
+document.getElementById("load-example").addEventListener("click", async function () {
+  setStatus("Loading the example manifest...", false);
+  try {
+    var resp = await fetch(apiBase() + "/example");
+    if (!resp.ok) throw new Error("bad status");
+    var data = await resp.json();
+    manifestEl.value = JSON.stringify(data, null, 2);
+    setStatus("Example loaded. Hit Audit manifest.", false);
+  } catch (err) {
+    showError("Could not load the example from the backend. Is it running? python -m playground.app");
+  }
+});
+
+document.getElementById("load-clean").addEventListener("click", function () {
+  manifestEl.value = JSON.stringify(CLEAN_MANIFEST, null, 2);
+  setStatus("Clean example loaded. Hit Audit manifest.", false);
+});
+
+document.getElementById("format").addEventListener("click", function () {
+  try {
+    manifestEl.value = JSON.stringify(JSON.parse(manifestEl.value), null, 2);
+    setStatus("Formatted.", false);
+  } catch (err) {
+    setStatus("Cannot format yet: " + err.message, true);
+  }
+});
+
+document.getElementById("share").addEventListener("click", async function () {
+  var link = shareLink();
+  try {
+    await navigator.clipboard.writeText(link);
+    setStatus("Share link copied. Anyone who opens it sees this manifest preloaded.", false);
+  } catch (err) {
+    window.prompt("Copy this share link:", link);
+  }
+});
+
+document.getElementById("clear").addEventListener("click", function () {
+  manifestEl.value = "";
+  summaryEl.textContent = "";
+  resultsEl.textContent = "";
+  resultsEl.appendChild(el("p", "empty", "Cleared. Paste a manifest whenever you are ready."));
+  setStatus("", false);
+  history.replaceState(null, "", window.location.pathname + window.location.search);
+});
+
+// On load, a share link (#m=...) preloads its manifest and audits it
+// right away, so the person receiving the link lands on the findings.
+(function initFromHash() {
+  if (window.location.hash.indexOf("#m=") !== 0) return;
+  try {
+    var text = decodeManifest(window.location.hash.slice(3));
+    JSON.parse(text);
+    manifestEl.value = text;
+    runAudit();
+  } catch (err) {
+    setStatus("That share link did not decode into a manifest, so I left the box empty.", true);
+  }
+})();
+</script>
+</body>
+</html>
