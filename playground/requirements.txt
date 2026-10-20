@@ -1,0 +1,9 @@
+# Playground service dependencies. The library itself stays
+# dependency-free; these are only for running playground/app.py.
+# Install the library first, from the repo root: pip install -e .
+fastapi>=0.110
+uvicorn>=0.29
+
+# Only needed to run playground/tests (the API tests use the
+# FastAPI TestClient, which is built on httpx):
+#   pip install pytest httpx
