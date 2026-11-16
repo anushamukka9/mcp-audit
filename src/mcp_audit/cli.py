@@ -283,7 +283,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     scfg = sub.add_parser(
         "scan-config",
-        help="Scan MCP client configs (Claude Desktop, Cursor, Claude Code).",
+        help="Scan MCP client configs (Claude Desktop, Cursor, Windsurf, Claude Code).",
         description=(
             "Read MCP client config files and flag risky server entries: "
             "unpinned remote packages, plaintext secrets, unauthenticated "
@@ -295,7 +295,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--path",
         default=None,
         help="Config file to scan. Defaults to auto-discovering the usual "
-        "Claude Desktop / Cursor / Claude Code locations.",
+        "Claude Desktop / Cursor / Windsurf / Claude Code locations, "
+        "including project configs (.cursor/mcp.json, .mcp.json).",
     )
     scfg.add_argument(
         "--format",

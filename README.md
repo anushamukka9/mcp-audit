@@ -120,9 +120,12 @@ without deploying anything. See [docs/live-audit.md](docs/live-audit.md).
 ## Scanning client configs
 
 Your MCP client config is attack surface too. `scan-config` reads your
-Claude Desktop, Cursor, or Claude Code config and flags the risky
-entries: unpinned `npx` packages, plaintext secrets, unauthenticated or
-plaintext-HTTP remote servers, and `curl | sh` install patterns:
+Claude Desktop, Cursor, Windsurf, or Claude Code config (global and
+project files alike) and flags the risky entries: unpinned `npx`
+packages, plaintext secrets, unauthenticated or plaintext-HTTP remote
+servers, and `curl | sh` install patterns. Windsurf's `serverUrl`
+spelling and the `type` transport spelling are normalized first, so a
+Windsurf remote entry gets the same checks as any other:
 
 ```bash
 $ mcp-audit scan-config
