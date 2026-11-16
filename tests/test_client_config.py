@@ -5,12 +5,18 @@ fixtures, and the scan-config CLI path end to end.
 """
 
 import json
+from pathlib import Path
 
 import pytest
 
 from mcp_audit import audit_server
 from mcp_audit.cli import main as cli_main
-from mcp_audit.client_config import normalize_servers, scan_client_config
+from mcp_audit.client_config import (
+    default_config_paths,
+    normalize_servers,
+    scan_client_config,
+    scan_discovered_configs,
+)
 
 RISKY_CONFIG = {
     "mcpServers": {
@@ -188,3 +194,114 @@ def test_cli_scan_config_clean(tmp_path, capsys):
     path.write_text(json.dumps({"mcpServers": {}}))
     code = cli_main(["scan-config", "--path", str(path)])
     assert code == 0
+
+
+# --- Cursor and Windsurf expansion (Nov 16) ---
+
+EXAMPLES = Path(__file__).resolve().parent.parent / "examples" / "client-configs"
+
+WINDSURF_CONFIG = {
+    "mcpServers": {
+        "ws-remote": {"serverUrl": "http://mcp.example.com/sse"},
+        "ws-authed": {
+            "serverUrl": "https://mcp.example.com/mcp",
+            "headers": {"Authorization": "Bearer abc"},
+        },
+        "ws-sse": {"serverUrl": "https://mcp.example.com/sse", "type": "sse"},
+        "ws-streamable": {"serverUrl": "https://mcp.example.com/mcp", "type": "streamable-http"},
+        "ws-remote-env": {
+            "serverUrl": "https://mcp.example.com/mcp",
+            "headers": {"Authorization": "Bearer abc"},
+            "env": {"REMOTE_API_KEY": "placeholder-value"},
+        },
+        "ws-disabled": {"serverUrl": "http://mcp.example.com/sse", "disabled": True},
+    }
+}
+
+
+def test_windsurf_server_url_normalizes_to_remote():
+    servers = normalize_servers(WINDSURF_CONFIG, "windsurf")
+    by_name = {s["name"]: s for s in servers}
+    assert by_name["ws-remote"]["transport"] == "http"
+    assert by_name["ws-remote"]["url"] == "http://mcp.example.com/sse"
+    assert by_name["ws-sse"]["transport"] == "sse"
+    assert by_name["ws-streamable"]["transport"] == "http"
+
+
+def test_windsurf_server_url_gets_the_same_checks():
+    report = _scan(WINDSURF_CONFIG)
+    unauth = {f.target: f for f in _by_target(report, "config_unauthenticated_http")}
+    assert unauth["server:ws-remote"].severity == "high"
+    assert "server:ws-authed" not in unauth
+    insecure = [f.target for f in _by_target(report, "config_insecure_transport")]
+    assert "server:ws-remote" in insecure
+
+
+def test_http_url_spelling_also_normalizes():
+    servers = normalize_servers({"mcpServers": {"r": {"httpUrl": "https://x.example/mcp"}}}, "t")
+    assert servers[0]["transport"] == "http"
+    assert servers[0]["url"] == "https://x.example/mcp"
+
+
+def test_remote_entry_env_is_kept_and_flagged():
+    report = _scan(WINDSURF_CONFIG)
+    findings = _by_target(report, "config_plaintext_secret")
+    assert [f.target for f in findings] == ["server:ws-remote-env"]
+
+
+def test_disabled_entry_is_still_scanned():
+    servers = normalize_servers(WINDSURF_CONFIG, "windsurf")
+    by_name = {s["name"]: s for s in servers}
+    assert by_name["ws-disabled"]["disabled"] is True
+    report = _scan(WINDSURF_CONFIG)
+    targets = [f.target for f in _by_target(report, "config_unauthenticated_http")]
+    assert "server:ws-disabled" in targets
+
+
+def test_default_paths_cover_cursor_and_windsurf():
+    labels = {label: path for label, path in default_config_paths()}
+    assert labels["cursor"].name == "mcp.json"
+    assert labels["cursor-project"].parts[-2:] == (".cursor", "mcp.json")
+    assert labels["windsurf"].name == "mcp_config.json"
+    assert "windsurf" in str(labels["windsurf"])
+    assert labels["windsurf-devin"].name == "mcp_config.json"
+    assert "devin" in str(labels["windsurf-devin"])
+    assert labels["claude-code-project"].name == ".mcp.json"
+
+
+def test_scan_discovered_finds_windsurf_under_fake_home(tmp_path, monkeypatch):
+    cfg = tmp_path / ".codeium" / "windsurf" / "mcp_config.json"
+    cfg.parent.mkdir(parents=True)
+    cfg.write_text(json.dumps(WINDSURF_CONFIG))
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    found = scan_discovered_configs()
+    by_label = {label: report for label, _path, report in found}
+    assert "windsurf" in by_label
+    ids = {f.check_id for f in by_label["windsurf"].findings}
+    assert "config_unauthenticated_http" in ids
+    assert by_label["windsurf"].manifest_name == "client-config:windsurf"
+
+
+def test_scan_client_config_source_label(tmp_path):
+    path = tmp_path / "mcp_config.json"
+    path.write_text(json.dumps(WINDSURF_CONFIG))
+    report = scan_client_config(path, source_label="windsurf")
+    assert report.manifest_name == "client-config:windsurf"
+    assert all("windsurf" in f.explanation for f in report.findings)
+
+
+def test_windsurf_fixture_file():
+    report = scan_client_config(EXAMPLES / "windsurf_mcp_config.json", source_label="windsurf")
+    ids = {f.check_id for f in report.findings}
+    assert ids == {
+        "config_remote_package",
+        "config_plaintext_secret",
+        "config_unauthenticated_http",
+        "config_insecure_transport",
+    }
+
+
+def test_cursor_project_fixture_file_is_clean():
+    report = scan_client_config(EXAMPLES / "cursor_project_mcp.json", source_label="cursor-project")
+    assert report.findings == []

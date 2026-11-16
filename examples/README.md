@@ -39,3 +39,17 @@ anything.
 python examples/live_audit_demo.py
 python examples/live_audit_demo.py --format markdown
 ```
+
+## client-configs/
+
+Sample client configs for `scan-config`, one per client shape:
+
+- `client-configs/windsurf_mcp_config.json`: a Windsurf config using
+  the `serverUrl` spelling. Trips four checks (unpinned package,
+  plaintext secret, unauthenticated HTTP, plaintext HTTP).
+- `client-configs/cursor_project_mcp.json`: a clean project-level
+  Cursor config (`.cursor/mcp.json`). Zero findings.
+
+```bash
+mcp-audit scan-config --path examples/client-configs/windsurf_mcp_config.json
+```

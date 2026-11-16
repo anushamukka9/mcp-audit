@@ -29,7 +29,7 @@ from .core import (
 from .cve_feed import CveEntry, CveFeed, load_feed
 from .policy import AuditPolicy
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 
 
 def audit_server(

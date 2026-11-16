@@ -1,0 +1,1 @@
+{"mcpServers":{"project-db":{"args":["project-db-server@2.0.0"],"command":"uvx","env":{"LOG_LEVEL":"info"}},"project-remote":{"headers":{"Authorization":"Bearer placeholder"},"type":"sse","url":"https://mcp.example.com/sse"}}}

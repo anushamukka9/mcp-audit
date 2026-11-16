@@ -1,0 +1,1 @@
+{"mcpServers":{"windsurf-clean-remote":{"headers":{"Authorization":"Bearer placeholder"},"serverUrl":"https://mcp.example.com/mcp"},"windsurf-leaky":{"command":"/usr/local/bin/server","env":{"DEBUG":"1","EXAMPLE_API_KEY":"placeholder-value"}},"windsurf-local-pkg":{"args":["-y","some-windsurf-server"],"command":"npx"},"windsurf-remote":{"serverUrl":"http://mcp.example.com/sse"}}}
